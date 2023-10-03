@@ -107,26 +107,22 @@ with st.container() as container:
      category = st.selectbox(label=question_categories[1], options=categories)
      if category != "選択してください":
         # カテゴリーに応じて説明、収入、支出の入力フィールドを動的に変更
-        if category == "給与" or category == "お小遣い":
-            description_label = "詳細 (選択)"
-            description_options = ["大河", "幸華"]
-            income_label = "収入"
-            expense_label = "支出"
+        if category == "給与":
+            description = st.selectbox(label="詳細 (選択)", options=["大河", "幸華"])
+            income = st.text_input(label=question_categories[3])
         elif category == "その他":
+            description = st.selectbox(label="詳細 (選択)", options= ["病院", "旅行", "イベント", "贈与", "その他"])
+            expense = st.text_input(question_categories[4])
+        elif category == "楽天証券前月比":
+            income = st.text_input(label=question_categories[3])
+        elif category == "お小遣い":
             description_label = "詳細 (選択)"
-            description_options = ["病院", "旅行", "イベント", "贈与", "その他"]
-            income_label = "収入"
-            expense_label = "支出"
+            description = st.selectbox(label="詳細 (選択)", options= ["大河", "幸華"])
+            expense = st.text_input(question_categories[4])
         else:
-            description_label = "詳細"
-            description_options = st.text_input(label="詳細 (テキスト)")
-            income_label = "収入"
-            expense_label = "支出"
-
-        description = st.selectbox(label=description_label, options=description_options)
-        income = st.text_input(label=income_label)
-        expense = st.text_input(label=expense_label)
-        submitted = st.button("送信")
+            description = st.text_input(label="詳細 (テキスト)")
+            expense = st.text_input(question_categories[4])
+     submitted = st.button("送信")
     
 # with st.form("my_form", clear_on_submit=True):
 #     date = st.date_input(question_categories[0])
@@ -157,6 +153,9 @@ with st.container() as container:
 #     submitted = st.form_submit_button("送信")
 
 if submitted:
+    if category == "選択してください":
+        st.error("カテゴリーを選択してください")
+        st.stop()
     with st.spinner("データ更新中..."):
         time.sleep(1)
     val = date.isoformat()
