@@ -110,17 +110,22 @@ with st.container() as container:
         if category == "給与":
             description = st.selectbox(label="詳細 (選択)", options=["大河", "幸華"])
             income = st.text_input(label=question_categories[3])
+            expense = 0
         elif category == "その他":
             description = st.selectbox(label="詳細 (選択)", options= ["病院", "旅行", "イベント", "贈与", "その他"])
+            income = 0
             expense = st.text_input(question_categories[4])
         elif category == "楽天証券前月比":
             income = st.text_input(label=question_categories[3])
+            expense = 0
         elif category == "お小遣い":
             description_label = "詳細 (選択)"
             description = st.selectbox(label="詳細 (選択)", options= ["大河", "幸華"])
+            income = 0
             expense = st.text_input(question_categories[4])
         else:
             description = st.text_input(label="詳細 (テキスト)")
+            income = 0
             expense = st.text_input(question_categories[4])
      submitted = st.button("送信")
     
