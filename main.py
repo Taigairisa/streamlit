@@ -85,16 +85,76 @@ row_data_button = st.sidebar.checkbox("生データを見る")
 monthly_transition_button = st.sidebar.checkbox("資産推移を見る")
 monthly_category_button = st.sidebar.checkbox("月ごとの収支を見る")
 
-categories = ["給与", "二人で遊ぶお金", "食費/消耗品", "耐久消耗品", "お小遣い", "楽天証券前月比", "その他"]
+categories = ["選択してください","二人で遊ぶお金", "食費/消耗品", "耐久消耗品", "お小遣い","その他", "給与", "楽天証券前月比"]
 
 st.title("家計簿入力")
-with st.form("my_form", clear_on_submit=True):
-    date = st.date_input(question_categories[0])
-    category = st.selectbox(label=question_categories[1], options=categories)
-    description = st.text_area(question_categories[2])
-    income = st.text_input(question_categories[3])
-    expense = st.text_input(question_categories[4])
-    submitted = st.form_submit_button("送信")
+
+css = """
+    <style>
+        .custom-container {
+            padding: 10px;
+            border: 2px solid gray;
+            border-radius: 5px;
+        }
+    </style>
+"""
+
+# StreamlitでCSSを表示
+st.markdown(css, unsafe_allow_html=True)
+
+with st.container() as container:
+     date = st.date_input(question_categories[0])
+     category = st.selectbox(label=question_categories[1], options=categories)
+     if category != "選択してください":
+        # カテゴリーに応じて説明、収入、支出の入力フィールドを動的に変更
+        if category == "給与" or category == "お小遣い":
+            description_label = "詳細 (選択)"
+            description_options = ["大河", "幸華"]
+            income_label = "収入"
+            expense_label = "支出"
+        elif category == "その他":
+            description_label = "詳細 (選択)"
+            description_options = ["病院", "旅行", "イベント", "贈与", "その他"]
+            income_label = "収入"
+            expense_label = "支出"
+        else:
+            description_label = "詳細"
+            description_options = st.text_input(label="詳細 (テキスト)")
+            income_label = "収入"
+            expense_label = "支出"
+
+        description = st.selectbox(label=description_label, options=description_options)
+        income = st.text_input(label=income_label)
+        expense = st.text_input(label=expense_label)
+        submitted = st.button("送信")
+    
+# with st.form("my_form", clear_on_submit=True):
+#     date = st.date_input(question_categories[0])
+#     category = st.selectbox(label=question_categories[1], options=categories)
+#     if category != "選択してください":
+#         # カテゴリーに応じて説明、収入、支出の入力フィールドを動的に変更
+#         if category == "給与" or category == "お小遣い":
+#             description_label = "詳細 (選択)"
+#             description_options = ["大河", "幸華"]
+#             income_label = "収入"
+#             expense_label = "支出"
+#         elif category == "その他":
+#             description_label = "詳細 (選択)"
+#             description_options = ["病院", "旅行", "イベント", "贈与", "その他"]
+#             income_label = "収入"
+#             expense_label = "支出"
+#         else:
+#             description_label = "詳細"
+#             description_options = st.text_input(label="詳細 (テキスト)")
+#             income_label = "収入"
+#             expense_label = "支出"
+
+#         description = st.selectbox(label=description_label, options=description_options)
+#         income = st.text_input(label=income_label)
+#         expense = st.text_input(label=expense_label)
+#     # income = st.text_input(question_categories[3])
+#     # expense = st.text_input(question_categories[4])
+#     submitted = st.form_submit_button("送信")
 
 if submitted:
     with st.spinner("データ更新中..."):
