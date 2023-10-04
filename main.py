@@ -77,9 +77,9 @@ st.sidebar.write("""
     ## データを見る
 """)
 st.sidebar.slider("ウィジェット",1,50,20)
-view_category = st.sidebar.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ変更"])
+view_category = st.sidebar.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ削除"])
 
-
+import gspread_dataframe
 if view_category == "入力フォーム":
 
     st.title("家計簿入力")
@@ -158,6 +158,32 @@ elif view_category == "データ一覧":
 
         st.altair_chart(bars, use_container_width=True)
         st.dataframe(filtered_df)
+
+elif view_category == "データ削除":
+    with st.form("my_form", clear_on_submit=True):
+        input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出"])
+        worksheet = sh.worksheet(input_category)
+        df = get_dataFrame(sh, input_category)
+        display = st.dataframe(df)
+        # ユーザーが削除したいデータ列を選択
+        selected_row_indices = st.multiselect("削除したい行を選択", list(df[::-1].index)) 
+        submitted = st.form_submit_button("選択されたデータ行を削除")
+        # 選択されたデータ列をスプレッドシートから削除
+    if submitted:
+        for selected_row_index in selected_row_indices:
+            st.write(df.iloc[selected_row_index])
+        if st.button("本当に消しますか？"):
+            df = df.drop(selected_row_indices)  # 選択された行を削除
+            worksheet.clear()
+            gspread_dataframe.set_with_dataframe(worksheet,df)
+
+    # カスタムのリロードボタンを作成
+    reload_button = st.button("ページをリロード")
+
+    # リロードボタンがクリックされたときの処理
+    if reload_button:
+        # ページをリロードするJavaScriptコードを実行
+        st.write("<script>window.location.reload();</script>", unsafe_allow_html=True)
 
 # elif input_category == "収入":
 #     with st.form("my_form", clear_on_submit=True):
