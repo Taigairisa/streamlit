@@ -140,7 +140,7 @@ elif view_category == "データ一覧":
 
     #     st.line_chart(monthly_total['合計'])
 
-    if "月ごとの収支" in shown_data:
+    if "月ごとの支出" in shown_data:
         # 支出テーブルのみから集めたdf
         df = get_dataFrame(SHEET_KEY, "支出")
         selected_month = st.selectbox("月を選択してください", df['月'].unique())
