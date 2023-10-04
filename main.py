@@ -42,8 +42,8 @@ def convert_column_to_integer(df, column_name):
     if column_exists(df, column_name):
         df[column_name] = df[column_name].replace('', '0').astype(int)
 
-def get_dataFrame(sheet_key, sheet): 
-    worksheet = gc.open_by_key(sheet_key).worksheet(sheet)
+def get_dataFrame(sh, sheet): 
+    worksheet = sh.worksheet(sheet)
     data = worksheet.get_all_values() # シート内の全データを取得
     df = pd.DataFrame(data[1:], columns=data[0]) # 取得したデータをデータフレームに変換 
 
@@ -118,7 +118,6 @@ if view_category == "入力フォーム":
         questions = [val, category, description, money]
         result = [[category, answer] for category, answer in zip(question_categories, questions)]
         copyDataToBudgetSheet(result, worksheet, True)
-        df = get_dataFrame(SHEET_KEY, SP_SHEET)
 
 elif view_category == "データ一覧":
     
@@ -129,7 +128,7 @@ elif view_category == "データ一覧":
     # monthly_category_button = st.checkbox("月ごとの収支を見る")
     if "全データ" in shown_data:
         input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出"])
-        st.dataframe(get_dataFrame(SHEET_KEY, input_category))
+        st.dataframe(get_dataFrame(sh, input_category))
 
     # if monthly_transition_button:
     #     # 支出テーブルと収入テーブルのその月のものを全部足したdf
@@ -142,7 +141,7 @@ elif view_category == "データ一覧":
 
     if "月ごとの支出" in shown_data:
         # 支出テーブルのみから集めたdf
-        df = get_dataFrame(SHEET_KEY, "支出")
+        df = get_dataFrame(sh, "支出")
         selected_month = st.selectbox("月を選択してください", df['月'].unique())
         filtered_df = df[df['月'] == selected_month]
         st.subheader(f"{selected_month}の各カテゴリーごとの支出")
