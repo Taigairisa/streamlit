@@ -160,30 +160,27 @@ elif view_category == "データ一覧":
         st.dataframe(filtered_df)
 
 elif view_category == "データ削除":
-    with st.form("my_form", clear_on_submit=True):
-        input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出"])
-        worksheet = sh.worksheet(input_category)
-        df = get_dataFrame(sh, input_category)
-        display = st.dataframe(df)
-        # ユーザーが削除したいデータ列を選択
-        selected_row_indices = st.multiselect("削除したい行を選択", list(df[::-1].index)) 
-        submitted = st.form_submit_button("選択されたデータ行を削除")
-        # 選択されたデータ列をスプレッドシートから削除
-    if submitted:
-        for selected_row_index in selected_row_indices:
-            st.write(df.iloc[selected_row_index])
-        if st.button("本当に消しますか？"):
-            df = df.drop(selected_row_indices)  # 選択された行を削除
-            worksheet.clear()
-            gspread_dataframe.set_with_dataframe(worksheet,df)
-
-    # カスタムのリロードボタンを作成
-    reload_button = st.button("ページをリロード")
-
-    # リロードボタンがクリックされたときの処理
+    reload_button = st.button("更新")
+    # ページをリロードするJavaScriptコードを実行
     if reload_button:
-        # ページをリロードするJavaScriptコードを実行
         st.write("<script>window.location.reload();</script>", unsafe_allow_html=True)
+    
+    input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出"])
+    worksheet = sh.worksheet(input_category)
+    df = get_dataFrame(sh, input_category)
+    display = st.dataframe(df)
+    with st.form("my_form", clear_on_submit=True):
+        selected_row_indices = st.multiselect("削除したい行を選択", list(df[::-1].index)) 
+        submitted = st.form_submit_button("データを削除")
+
+    if submitted:
+        st.write("消したデータ：")
+        st.table(df.iloc[selected_row_indices])
+        df = df.drop(selected_row_indices)  # 選択された行を削除
+        worksheet.clear()
+        gspread_dataframe.set_with_dataframe(worksheet,df)
+        st.write("<script>window.location.reload();</script>", unsafe_allow_html=True)
+
 
 # elif input_category == "収入":
 #     with st.form("my_form", clear_on_submit=True):
