@@ -158,7 +158,7 @@ elif view_category == "データ一覧":
         )
 
         st.altair_chart(bars, use_container_width=True)
-
+        st.dataframe(filtered_df)
 
 # elif input_category == "収入":
 #     with st.form("my_form", clear_on_submit=True):
