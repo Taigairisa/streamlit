@@ -103,7 +103,7 @@ if view_category == "入力フォーム":
         question_categories = ["日付", "カテゴリ", "詳細", "支出"]
         categories = ["病院", "旅行", "イベント", "贈与", "その他"]
         date, category, description, money, submitted = makeForm(categories)
-        SP_SHEET = '特別'
+        SP_SHEET = '特別支出'
 
     worksheet = sh.worksheet(SP_SHEET)
     # 空の時にカラム名を埋め合わせる
