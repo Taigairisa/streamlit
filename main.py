@@ -119,6 +119,11 @@ credentials = service_account.Credentials.from_service_account_info( st.secrets[
 gc = gspread.authorize(credentials)
 sh = gc.open_by_key(SHEET_KEY)
 
+st.session_state["df_expenses"] = get_dataFrame(sh, "支出")
+st.session_state["df_income"] = get_dataFrame(sh, "収入")
+st.session_state["df_subscription"] = get_dataFrame(sh, "定期契約")
+st.session_state["df_special"] = get_dataFrame(sh, "特別支出")
+st.session_state["df_travel"] = get_dataFrame(sh, "旅行")
 
 view_category = st.sidebar.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ削除"])
 st.sidebar.markdown("---")
@@ -188,8 +193,8 @@ elif view_category == "データ一覧":
         st.dataframe(get_dataFrame(sh, input_category))
 
     elif "資産推移" in shown_data:
-        df_expenses = pd.concat([get_dataFrame(sh, "支出"),get_dataFrame(sh, "特別支出"),get_dataFrame(sh,"旅行")])
-        df_income = get_dataFrame(sh, "収入",)
+        df_expenses = pd.concat([st.session_state["df_expenses"],st.session_state["df_special"],st.session_state["df_travel"],st.session_state["df_subscription"]])
+        df_income = st.session_state["df_income"]
         df_transition = pd.concat([df_expenses, df_income]).fillna(0)
         df_transition['収支'] = df_transition["収入"]-df_transition["支出"]
         pivot_df = df_transition.pivot_table(index='月', values='収支', aggfunc='sum', fill_value=0).reset_index()
@@ -205,7 +210,7 @@ elif view_category == "データ一覧":
 
     elif "カテゴリー別支出" in shown_data:
         # 支出テーブルのみから集めたdf
-        df = get_dataFrame(sh, "支出")
+        df = st.session_state["df_expenses"]
         selected_month = st.selectbox("月を選択してください", df['月'].unique())
         filtered_df = df[df['月'] == selected_month]
         st.subheader(f"{selected_month}の各カテゴリーごとの支出")
@@ -224,7 +229,7 @@ elif view_category == "データ一覧":
         st.dataframe(filtered_df)
 
     elif "収入推移" in shown_data:
-        df = get_dataFrame(sh, "収入")
+        df = st.session_state["df_income"]
         pivot_df = df.pivot_table(index='月', columns='カテゴリ', values='収入', aggfunc='sum', fill_value=0).reset_index()
         monthly_total = pivot_df.groupby('月').sum()
         monthly_total['合計'] = monthly_total.sum(axis=1)
@@ -232,7 +237,7 @@ elif view_category == "データ一覧":
         st.line_chart(monthly_total['合計'])
 
     elif "定期契約推移" in shown_data:
-        df = get_dataFrame(sh, "定期契約")
+        df = st.session_state["df_subscription"]
         selected_category = st.selectbox("カテゴリを選択してください",df['カテゴリ'].unique())
         category_total = df[df['カテゴリ'] == selected_category]
         pivot_df = category_total.pivot_table(index='月', columns='カテゴリ', values='支出', aggfunc='sum', fill_value=0).reset_index()
@@ -242,7 +247,7 @@ elif view_category == "データ一覧":
         st.line_chart(monthly_total['合計'])
 
     elif "特別支出推移" in shown_data:
-        df = get_dataFrame(sh, "特別支出")
+        df = st.session_state["df_special"]
         selected_category = st.selectbox("カテゴリを選択してください",df['カテゴリ'].unique())
         category_total = df[df['カテゴリ'] == selected_category]
         pivot_df = category_total.pivot_table(index='月', columns='カテゴリ', values='支出', aggfunc='sum', fill_value=0).reset_index()
@@ -251,7 +256,7 @@ elif view_category == "データ一覧":
 
         st.line_chart(monthly_total['合計'])
     elif "旅行別" in shown_data:
-        df = get_dataFrame(sh, "旅行")
+        df = st.session_state["df_travel"]
         category_summary = df.groupby('場所')['支出'].sum().reset_index()
         bars = (
             alt.Chart(category_summary)
