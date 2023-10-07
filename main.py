@@ -70,6 +70,17 @@ def makeForm(categories):
         submitted = st.form_submit_button("送信")
     return questions, submitted
 
+def makeTravelForm():
+    with st.form("my_form", clear_on_submit=True):
+        date = st.date_input(question_categories[0])
+        category = st.text_input(label=question_categories[1])
+        description = st.text_input(label=question_categories[2])
+        money = st.text_input(question_categories[3])
+        val = date.isoformat()
+        questions = [val, category, description, money]
+        submitted = st.form_submit_button("送信")
+    return questions, submitted
+
 def makeBudgetForm(categories):
     with st.form("my_form", clear_on_submit=True):
         date = st.date_input(question_categories[0])
@@ -89,16 +100,17 @@ def getThisMonthSummary(category):
     category_summary = filtered_df.groupby('カテゴリ')[category].sum().reset_index()
     return category_summary
 
-def thisMonthRatio():
+def sideThisMonthRatio():
     today = datetime.date.today()
     df_used = getThisMonthSummary("支出").set_index("カテゴリ")
     df_budget = getThisMonthSummary("予算").set_index("カテゴリ")
     mixed_df = pd.concat([df_used,df_budget], axis=1).fillna(0)
-    mixed_df['割合'] = mixed_df['支出'] / mixed_df['予算']
-
-    st.write(f"【{today.month}月分】{today.month}月{today.day}日時点の使用状況：")
+    categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
+    mixed_df['割合'] = (mixed_df['支出'] / mixed_df['予算'])
+    mixed_df = mixed_df.reindex(categories)
+    st.sidebar.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
     for index, row in mixed_df.iterrows():
-        st.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
+        st.sidebar.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
 
 # スプレッドシートからデータ取得
 SHEET_KEY = st.secrets.SP_SHEET_KEY.key # スプレッドシートのキー
@@ -107,20 +119,19 @@ credentials = service_account.Credentials.from_service_account_info( st.secrets[
 gc = gspread.authorize(credentials)
 sh = gc.open_by_key(SHEET_KEY)
 
-st.sidebar.write("""
-    ## データを見る
-""")
-st.sidebar.slider("ウィジェット",1,50,20)
+
 view_category = st.sidebar.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ削除"])
+st.sidebar.markdown("---")
+sideThisMonthRatio()
 
 import gspread_dataframe
 if view_category == "入力フォーム":
 
     st.title("家計簿入力")
-    input_category = st.selectbox(label="入力フォーム変更", options=["支出","収入","定期契約","特別支出","予算"])
+    input_category = st.selectbox(label="入力フォーム変更", options=["支出","収入","定期契約","特別支出","旅行","予算"])
     if input_category == "支出":
         question_categories = ["日付", "カテゴリ", "詳細", "支出"]
-        categories = ["二人で遊ぶお金", "食費/消耗品", "耐久消耗品", "大河お小遣い", "幸華お小遣い"]
+        categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
         questions, submitted = makeForm(categories)
         SP_SHEET = '支出'
     elif input_category == "収入":
@@ -130,17 +141,21 @@ if view_category == "入力フォーム":
         SP_SHEET = '収入'
     elif input_category == "定期契約":
         question_categories = ["日付", "カテゴリ", "詳細", "支出"]
-        categories = ["家賃", "電気代","ガス代","通信代", "サブスク","その他"]
+        categories = ["家賃", "電気代","ガス代","通信代", "サブスク","積み立て投資","その他"]
         questions, submitted = makeForm(categories)
         SP_SHEET = '定期契約'
     elif input_category == "特別支出":
         question_categories = ["日付", "カテゴリ", "詳細", "支出"]
-        categories = ["病院", "旅行", "イベント", "贈与", "その他"]
+        categories = ["病院", "イベント", "贈与", "その他"]
         questions, submitted = makeForm(categories)
         SP_SHEET = '特別支出'
+    elif input_category == "旅行":
+        question_categories = ["日付", "場所", "詳細", "支出"]
+        questions, submitted = makeTravelForm()
+        SP_SHEET = '旅行'
     else:
         question_categories = ["日付", "月", "カテゴリ", "予算"]
-        categories = ["二人で遊ぶお金", "食費/消耗品", "耐久消耗品", "大河お小遣い", "幸華お小遣い"]
+        categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
         questions, submitted = makeBudgetForm(categories)
         SP_SHEET = '予算'
 
@@ -155,40 +170,16 @@ if view_category == "入力フォーム":
             time.sleep(1.5)
 
         copyDataToBudgetSheet(questions, worksheet, True)
-
-    thisMonthRatio()
-    
-
-    # budget = 30000
-    # expenses = 10000
-# # 使った額の割合を計算
-# budget_expenses = budget - expenses
-
-# # データフレームを作成
-# data = pd.DataFrame([[expenses,budget_expenses, ]],columns=['Expenses','Budget - Expenses'] )
-
-# st.bar_chart(data, color=("#808080","#32CD32",))
-# # Altairで積み上げ棒グラフを描画
-# chart = alt.Chart(data).mark_bar().encode(
-#     x=alt.X('Amount', stack=True, axis=None),
-#     y=alt.Y('Category', sort='-x'),
-#     color='Category'
-# ).properties(width=300, height=200)
-
-# st.write("今月の予算")
-# st.write(f"予算: {budget}")
-# st.write(f"使った額: {expenses}")
-# st.altair_chart(chart, use_container_width=True)
+        result = pd.DataFrame([[category, answer] for category, answer in zip(question_categories, questions)]).set_index(0).T
+        result.index = ["送信したデータ"]
+        st.write(result)
 
 elif view_category == "データ一覧":
     
     st.title("データ一覧")
-    shown_data = st.multiselect("見たいデータを選択してください", ["全データ", "資産推移", "カテゴリー別支出","収入推移" "電気代推移", "ガス代推移", "その他推移", "旅行別"], default = None)
-    # row_data_button = st.checkbox("生データを見る")
-    # monthly_transition_button = st.checkbox("資産推移を見る")
-    # monthly_category_button = st.checkbox("月ごとの収支を見る")
+    shown_data = st.multiselect("見たいデータを選択してください", ["全データ", "資産推移", "カテゴリー別支出","収入推移", "定期契約推移", "特別支出推移", "旅行別"], default = None)
     if "全データ" in shown_data:
-        input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出"])
+        input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出","旅行"])
         st.dataframe(get_dataFrame(sh, input_category))
 
     # if monthly_transition_button:
@@ -220,6 +211,48 @@ elif view_category == "データ一覧":
         st.altair_chart(bars, use_container_width=True)
         st.dataframe(filtered_df)
 
+    if "収入推移" in shown_data:
+        df = get_dataFrame(sh, "収入")
+        pivot_df = df.pivot_table(index='月', columns='カテゴリ', values='収入', aggfunc='sum', fill_value=0).reset_index()
+        monthly_total = pivot_df.groupby('月').sum()
+        monthly_total['合計'] = monthly_total.sum(axis=1)
+
+        st.line_chart(monthly_total['合計'])
+
+    if "定期契約推移" in shown_data:
+        df = get_dataFrame(sh, "定期契約")
+        selected_category = st.selectbox("カテゴリを選択してください",df['カテゴリ'].unique())
+        category_total = df[df['カテゴリ'] == selected_category]
+        pivot_df = category_total.pivot_table(index='月', columns='カテゴリ', values='支出', aggfunc='sum', fill_value=0).reset_index()
+        monthly_total = pivot_df.groupby('月').sum()
+        monthly_total['合計'] = monthly_total.sum(axis=1)
+
+        st.line_chart(monthly_total['合計'])
+
+    if "特別支出推移" in shown_data:
+        df = get_dataFrame(sh, "特別支出")
+        selected_category = st.selectbox("カテゴリを選択してください",df['カテゴリ'].unique())
+        category_total = df[df['カテゴリ'] == selected_category]
+        pivot_df = category_total.pivot_table(index='月', columns='カテゴリ', values='支出', aggfunc='sum', fill_value=0).reset_index()
+        monthly_total = pivot_df.groupby('月').sum()
+        monthly_total['合計'] = monthly_total.sum(axis=1)
+
+        st.line_chart(monthly_total['合計'])
+    if "旅行別" in shown_data:
+        df = get_dataFrame(sh, "旅行")
+        category_summary = df.groupby('場所')['支出'].sum().reset_index()
+        bars = (
+            alt.Chart(category_summary)
+            .mark_bar()
+            .encode(
+                x="場所:N",
+                y=alt.Y("支出:Q"),
+                color="場所:N",
+            )
+        )
+        st.altair_chart(bars, use_container_width=True)
+        st.dataframe(filtered_df)
+
 elif view_category == "データ削除":
     reload_button = st.button("更新")
     # ページをリロードするJavaScriptコードを実行
@@ -242,65 +275,3 @@ elif view_category == "データ削除":
         gspread_dataframe.set_with_dataframe(worksheet,df)
         st.write("<script>window.location.reload();</script>", unsafe_allow_html=True)
 
-
-# elif input_category == "収入":
-#     with st.form("my_form", clear_on_submit=True):
-#         date = st.date_input(question_categories[0])
-#         category = st.selectbox(label=question_categories[1], options=categories)
-#         if category != "選択してください":
-#         if category == "給与":
-#             description = st.selectbox(label="詳細 (選択)", options=["大河", "幸華"])
-#             income = st.text_input(label=question_categories[3])
-#             expense = 0
-#         elif category == "その他":
-#             description = st.selectbox(label="詳細 (選択)", options= ["病院", "旅行", "イベント", "贈与", "その他"])
-#             income = 0
-#             expense = st.text_input(question_categories[4])
-#         elif category == "楽天証券前月比":
-#             income = st.text_input(label=question_categories[3])
-#             expense = 0
-#     submitted = st.form_submit_button("送信")
-    
-
-# if submitted:
-#     if category == "選択してください":
-#         st.error("カテゴリーを選択してください")
-#         st.stop()
-#     with st.spinner("データ更新中..."):
-#         time.sleep(1)
-#     val = date.isoformat()
-#     questions = [val, category, description, income, expense]
-#     result = [[category, answer] for category, answer in zip(question_categories, questions)]
-#     copyDataToBudgetSheet(result, worksheet, True)
-#     df = get_dataFrame(SHEET_KEY, SP_SHEET)
-
-
-######################################
-
-# with st.form("my_form", clear_on_submit=True):
-#     date = st.date_input(question_categories[0])
-#     category = st.selectbox(label=question_categories[1], options=categories)
-#     if category != "選択してください":
-#         # カテゴリーに応じて説明、収入、支出の入力フィールドを動的に変更
-#         if category == "給与" or category == "お小遣い":
-#             description_label = "詳細 (選択)"
-#             description_options = ["大河", "幸華"]
-#             income_label = "収入"
-#             expense_label = "支出"
-#         elif category == "その他":
-#             description_label = "詳細 (選択)"
-#             description_options = ["病院", "旅行", "イベント", "贈与", "その他"]
-#             income_label = "収入"
-#             expense_label = "支出"
-#         else:
-#             description_label = "詳細"
-#             description_options = st.text_input(label="詳細 (テキスト)")
-#             income_label = "収入"
-#             expense_label = "支出"
-
-#         description = st.selectbox(label=description_label, options=description_options)
-#         income = st.text_input(label=income_label)
-#         expense = st.text_input(label=expense_label)
-#     # income = st.text_input(question_categories[3])
-#     # expense = st.text_input(question_categories[4])
-#     submitted = st.form_submit_button("送信")
