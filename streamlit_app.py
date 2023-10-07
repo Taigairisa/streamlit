@@ -55,7 +55,7 @@ def get_dataFrame(sh, sheet):
 
     # 日付列を日付型に変換
     df['日付'] = pd.to_datetime(df['日付'], format='ISO8601')
-    df['月'] = df['日付'].dt.strftime('%Y-%m')
+    df['月'] = df['日付'].dt.strftime('%Y/%m')
 
     return df
 
@@ -95,7 +95,7 @@ def makeBudgetForm(categories):
 def getThisMonthSummary(category):
     df = get_dataFrame(sh,category)
     today = datetime.date.today()
-    this_month = today.strftime('%Y-%m')
+    this_month = today.strftime('%Y/%m')
     filtered_df = df[df['月'] == this_month]
     category_summary = filtered_df.groupby('カテゴリ')[category].sum().reset_index()
     return category_summary
@@ -211,7 +211,7 @@ elif view_category == "データ一覧":
     elif "カテゴリー別支出" in shown_data:
         # 支出テーブルのみから集めたdf
         df = st.session_state["df_expenses"]
-        selected_month = st.slider("月を選択してください", df['月'].unique())
+        selected_month = st.select_slider("月を選択してください", list(df['月'].unique())) 
         filtered_df = df[df['月'] == selected_month]
         st.subheader(f"{selected_month}の各カテゴリーごとの支出")
         category_summary = filtered_df.groupby('カテゴリ')['支出'].sum().reset_index()
