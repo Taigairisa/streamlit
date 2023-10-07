@@ -177,21 +177,28 @@ if view_category == "入力フォーム":
 elif view_category == "データ一覧":
     
     st.title("データ一覧")
-    shown_data = st.multiselect("見たいデータを選択してください", ["全データ", "資産推移", "カテゴリー別支出","収入推移", "定期契約推移", "特別支出推移", "旅行別"], default = None)
+    shown_data = st.selectbox(label="見たいデータを選択してください", options=["全データ", "資産推移", "カテゴリー別支出","収入推移", "定期契約推移", "特別支出推移", "旅行別"])
     if "全データ" in shown_data:
         input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出","旅行"])
         st.dataframe(get_dataFrame(sh, input_category))
 
-    # if monthly_transition_button:
-    #     # 支出テーブルと収入テーブルのその月のものを全部足したdf
-    #     df = 
-    #     pivot_df = df.pivot_table(index='月', columns='カテゴリ', values='収支', aggfunc='sum', fill_value=0).reset_index()
-    #     monthly_total = pivot_df.groupby('月').sum()
-    #     monthly_total['合計'] = monthly_total.sum(axis=1)
+    elif "資産推移" in shown_data:
+        df_expenses = pd.concat([get_dataFrame(sh, "支出"),get_dataFrame(sh, "特別支出"),get_dataFrame(sh,"旅行")])
+        df_income = get_dataFrame(sh, "収入",)
+        df_transition = pd.concat([df_expenses, df_income]).fillna(0)
+        df_transition['収支'] = df_transition["収入"]-df_transition["支出"]
+        pivot_df = df_transition.pivot_table(index='月', values='収支', aggfunc='sum', fill_value=0).reset_index()
+        
+        df_balance = get_dataFrame(sh, "資産")
+        today = datetime.date.today()
+        this_month = today.strftime('%Y-%m')
+        df_balance_today = df_balance[df_balance["月"]==this_month]
+        balance_value_today = df_balance_today["残高"].astype(int).sum()
 
-    #     st.line_chart(monthly_total['合計'])
+        pivot_df['収支'] = pivot_df["収支"] + balance_value_today
+        st.line_chart(pivot_df.set_index('月'))
 
-    if "カテゴリー別支出" in shown_data:
+    elif "カテゴリー別支出" in shown_data:
         # 支出テーブルのみから集めたdf
         df = get_dataFrame(sh, "支出")
         selected_month = st.selectbox("月を選択してください", df['月'].unique())
@@ -211,7 +218,7 @@ elif view_category == "データ一覧":
         st.altair_chart(bars, use_container_width=True)
         st.dataframe(filtered_df)
 
-    if "収入推移" in shown_data:
+    elif "収入推移" in shown_data:
         df = get_dataFrame(sh, "収入")
         pivot_df = df.pivot_table(index='月', columns='カテゴリ', values='収入', aggfunc='sum', fill_value=0).reset_index()
         monthly_total = pivot_df.groupby('月').sum()
@@ -219,7 +226,7 @@ elif view_category == "データ一覧":
 
         st.line_chart(monthly_total['合計'])
 
-    if "定期契約推移" in shown_data:
+    elif "定期契約推移" in shown_data:
         df = get_dataFrame(sh, "定期契約")
         selected_category = st.selectbox("カテゴリを選択してください",df['カテゴリ'].unique())
         category_total = df[df['カテゴリ'] == selected_category]
@@ -229,7 +236,7 @@ elif view_category == "データ一覧":
 
         st.line_chart(monthly_total['合計'])
 
-    if "特別支出推移" in shown_data:
+    elif "特別支出推移" in shown_data:
         df = get_dataFrame(sh, "特別支出")
         selected_category = st.selectbox("カテゴリを選択してください",df['カテゴリ'].unique())
         category_total = df[df['カテゴリ'] == selected_category]
@@ -238,7 +245,7 @@ elif view_category == "データ一覧":
         monthly_total['合計'] = monthly_total.sum(axis=1)
 
         st.line_chart(monthly_total['合計'])
-    if "旅行別" in shown_data:
+    elif "旅行別" in shown_data:
         df = get_dataFrame(sh, "旅行")
         category_summary = df.groupby('場所')['支出'].sum().reset_index()
         bars = (
@@ -251,7 +258,7 @@ elif view_category == "データ一覧":
             )
         )
         st.altair_chart(bars, use_container_width=True)
-        st.dataframe(filtered_df)
+        st.dataframe(category_summary)
 
 elif view_category == "データ削除":
     reload_button = st.button("更新")
