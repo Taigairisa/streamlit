@@ -43,21 +43,7 @@ def convert_column_to_integer(df, column_name):
     if column_exists(df, column_name):
         df[column_name] = df[column_name].replace('', '0').astype(int)
 
-def get_dataFrame(sh, sheet): 
-    worksheet = sh.worksheet(sheet)
-    data = worksheet.get_all_values() # シート内の全データを取得
-    df = pd.DataFrame(data[1:], columns=data[0]) # 取得したデータをデータフレームに変換 
 
-    convert_column_to_integer(df,"収入")
-    convert_column_to_integer(df,"支出")
-    convert_column_to_integer(df,"収支")
-    convert_column_to_integer(df,"予算")
-
-    # 日付列を日付型に変換
-    df['日付'] = pd.to_datetime(df['日付'], format='ISO8601')
-    df['月'] = df['日付'].dt.strftime('%Y/%m')
-
-    return df
 
 def makeForm(categories):
     with st.form("my_form", clear_on_submit=True):
@@ -93,7 +79,7 @@ def makeBudgetForm(categories):
     return questions, submitted
 
 def getThisMonthSummary(category):
-    df = get_dataFrame(sh,category)
+    df = get_dataframe_from_sheet(sh,category)
     today = datetime.date.today()
     this_month = today.strftime('%Y/%m')
     filtered_df = df[df['月'] == this_month]
@@ -112,18 +98,60 @@ def sideThisMonthRatio():
     for index, row in mixed_df.iterrows():
         st.sidebar.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
 
-# スプレッドシートからデータ取得
-SHEET_KEY = st.secrets.SP_SHEET_KEY.key # スプレッドシートのキー
-scopes = [ 'https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-credentials = service_account.Credentials.from_service_account_info( st.secrets["gcp_service_account"], scopes=scopes)
-gc = gspread.authorize(credentials)
-sh = gc.open_by_key(SHEET_KEY)
+# グローバル変数の設定
+SHEET_KEY = st.secrets.SP_SHEET_KEY.key
+SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+SERVICE_ACCOUNT = st.secrets["gcp_service_account"]
 
-st.session_state["df_expenses"] = get_dataFrame(sh, "支出")
-st.session_state["df_income"] = get_dataFrame(sh, "収入")
-st.session_state["df_subscription"] = get_dataFrame(sh, "定期契約")
-st.session_state["df_special"] = get_dataFrame(sh, "特別支出")
-st.session_state["df_travel"] = get_dataFrame(sh, "旅行")
+# @st.cache_data
+def get_gspread_client():
+    # キャッシュを使用して認証情報をキャッシュ
+    credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
+    gc = gspread.authorize(credentials)
+    return gc
+
+@st.cache_data
+def get_dataframe_from_sheet(_gc, sheet_name):
+    # キャッシュを使用してシートデータを取得
+
+    sh = _gc.open_by_key(SHEET_KEY)
+    worksheet = sh.worksheet(sheet_name)
+    data = worksheet.get_all_values()
+    df = pd.DataFrame(data[1:], columns=data[0])
+    convert_column_to_integer(df,"収入")
+    convert_column_to_integer(df,"支出")
+    convert_column_to_integer(df,"収支")
+    convert_column_to_integer(df,"予算")
+
+    # 日付列を日付型に変換
+    df['日付'] = pd.to_datetime(df['日付'], format='ISO8601')
+    df['月'] = df['日付'].dt.strftime('%Y/%m')
+    return df
+
+def get_dataFrame(sh, sheet): 
+    worksheet = sh.worksheet(sheet)
+    data = worksheet.get_all_values() # シート内の全データを取得
+    df = pd.DataFrame(data[1:], columns=data[0]) # 取得したデータをデータフレームに変換 
+
+    convert_column_to_integer(df,"収入")
+    convert_column_to_integer(df,"支出")
+    convert_column_to_integer(df,"収支")
+    convert_column_to_integer(df,"予算")
+
+    # 日付列を日付型に変換
+    df['日付'] = pd.to_datetime(df['日付'], format='ISO8601')
+    df['月'] = df['日付'].dt.strftime('%Y/%m')
+    return df
+
+st.set_page_config(page_title="家計簿アプリ", initial_sidebar_state="expanded")
+
+sh = get_gspread_client()
+
+st.session_state["df_expenses"] = get_dataframe_from_sheet(sh, "支出")
+st.session_state["df_income"] = get_dataframe_from_sheet(sh, "収入")
+st.session_state["df_subscription"] = get_dataframe_from_sheet(sh, "定期契約")
+st.session_state["df_special"] = get_dataframe_from_sheet(sh, "特別支出")
+st.session_state["df_travel"] = get_dataframe_from_sheet(sh, "旅行")
 
 view_category = st.sidebar.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ削除"])
 st.sidebar.markdown("---")
@@ -168,7 +196,9 @@ if view_category == "入力フォーム":
         categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
         questions, submitted = makeBudgetForm(categories)
         SP_SHEET = '予算'
-
+    
+    sh = sh.open_by_key(SHEET_KEY)
+    
     worksheet = sh.worksheet(SP_SHEET)
     # 空の時にカラム名を埋め合わせる
     question_list = [[value] for value in question_categories]
@@ -190,7 +220,7 @@ elif view_category == "データ一覧":
     shown_data = st.selectbox(label="見たいデータを選択してください", options=["全データ", "資産推移", "カテゴリー別支出","収入推移", "定期契約推移", "特別支出推移", "旅行別"])
     if "全データ" in shown_data:
         input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出","旅行"])
-        st.dataframe(get_dataFrame(sh, input_category))
+        st.dataframe(get_dataframe_from_sheet(sh, input_category))
 
     elif "資産推移" in shown_data:
         df_expenses = pd.concat([st.session_state["df_expenses"],st.session_state["df_special"],st.session_state["df_travel"],st.session_state["df_subscription"]])
@@ -199,7 +229,7 @@ elif view_category == "データ一覧":
         df_transition['収支'] = df_transition["収入"]-df_transition["支出"]
         pivot_df = df_transition.pivot_table(index='月', values='収支', aggfunc='sum', fill_value=0).reset_index()
         
-        df_balance = get_dataFrame(sh, "残高")
+        df_balance = get_dataframe_from_sheet(sh, "残高")
         today = datetime.date.today()
         this_month = today.strftime('%Y/%m')
         df_balance_today = df_balance[df_balance["月"]==this_month]
@@ -278,7 +308,7 @@ elif view_category == "データ削除":
     
     input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出"])
     worksheet = sh.worksheet(input_category)
-    df = get_dataFrame(sh, input_category).drop(columns=['月'])
+    df = get_dataframe_from_sheet(sh, input_category).drop(columns=['月'])
     display = st.dataframe(df)
     with st.form("my_form", clear_on_submit=True):
         selected_row_indices = st.multiselect("削除したい行を選択", list(df[::-1].index)) 
