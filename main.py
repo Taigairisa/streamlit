@@ -201,7 +201,7 @@ elif view_category == "データ一覧":
         
         df_balance = get_dataFrame(sh, "残高")
         today = datetime.date.today()
-        this_month = today.strftime('%Y-%m')
+        this_month = today.strftime('%Y/%m')
         df_balance_today = df_balance[df_balance["月"]==this_month]
         balance_value_today = df_balance_today["残高"].astype(int).sum()
 
