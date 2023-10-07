@@ -211,7 +211,7 @@ elif view_category == "データ一覧":
     elif "カテゴリー別支出" in shown_data:
         # 支出テーブルのみから集めたdf
         df = st.session_state["df_expenses"]
-        selected_month = st.selectbox("月を選択してください", df['月'].unique())
+        selected_month = st.slider("月を選択してください", df['月'].unique())
         filtered_df = df[df['月'] == selected_month]
         st.subheader(f"{selected_month}の各カテゴリーごとの支出")
         category_summary = filtered_df.groupby('カテゴリ')['支出'].sum().reset_index()
