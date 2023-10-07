@@ -128,7 +128,7 @@ import gspread_dataframe
 if view_category == "入力フォーム":
 
     st.title("家計簿入力")
-    input_category = st.selectbox(label="入力フォーム変更", options=["支出","収入","定期契約","特別支出","旅行","予算"])
+    input_category = st.selectbox(label="入力フォーム変更", options=["支出","収入","定期契約","特別支出","旅行","予算","残高"])
     if input_category == "支出":
         question_categories = ["日付", "カテゴリ", "詳細", "支出"]
         categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
@@ -153,6 +153,11 @@ if view_category == "入力フォーム":
         question_categories = ["日付", "場所", "詳細", "支出"]
         questions, submitted = makeTravelForm()
         SP_SHEET = '旅行'
+    elif input_category == "残高":
+        question_categories = ["日付", "口座", "詳細","残高"]
+        categories = ["三井住友", "京都信用金庫", "楽天銀行", "楽天証券", "JAバンク", "ゆうちょ", "松井バンク", "松井証券"]
+        questions, submitted = makeForm(categories)
+        SP_SHEET= '残高'
     else:
         question_categories = ["日付", "月", "カテゴリ", "予算"]
         categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
@@ -189,7 +194,7 @@ elif view_category == "データ一覧":
         df_transition['収支'] = df_transition["収入"]-df_transition["支出"]
         pivot_df = df_transition.pivot_table(index='月', values='収支', aggfunc='sum', fill_value=0).reset_index()
         
-        df_balance = get_dataFrame(sh, "資産")
+        df_balance = get_dataFrame(sh, "残高")
         today = datetime.date.today()
         this_month = today.strftime('%Y-%m')
         df_balance_today = df_balance[df_balance["月"]==this_month]
