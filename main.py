@@ -278,7 +278,7 @@ elif view_category == "データ削除":
     
     input_category = st.select_slider(label="データを選択する",options=["支出","収入","定期契約","特別支出"])
     worksheet = sh.worksheet(input_category)
-    df = get_dataFrame(sh, input_category)
+    df = get_dataFrame(sh, input_category).drop(columns=['月'])
     display = st.dataframe(df)
     with st.form("my_form", clear_on_submit=True):
         selected_row_indices = st.multiselect("削除したい行を選択", list(df[::-1].index)) 
