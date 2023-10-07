@@ -110,7 +110,7 @@ def get_gspread_client():
     gc = gspread.authorize(credentials)
     return gc
 
-@st.cache_data
+@st.cache_data(ttl=600) 
 def get_dataframe_from_sheet(_gc, sheet_name):
     # キャッシュを使用してシートデータを取得
 
