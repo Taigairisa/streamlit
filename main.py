@@ -231,7 +231,7 @@ elif view_category == "データ一覧":
         pivot_df = get_pivot_df(df)
         st.line_chart(pivot_df)
 
-        if st.button("月別に表示する"):
+        if st.checkbox("月別に表示する"):
             selected_month = st.select_slider("月を選択してください", list(df['月'].unique())) 
             filtered_df = df[df['月'] == selected_month]
             st.subheader(f"{selected_month}の各カテゴリーごとの支出")
