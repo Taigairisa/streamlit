@@ -146,9 +146,10 @@ def side_bar():
     return view_category
 
 def get_pivot_df(df):
-        if '支出' in df.index.names:
+        pivot_df = pd.DataFrame()
+        if '支出' in df.columns:
             pivot_df = df.pivot_table(index='月', columns='カテゴリ', values='支出', aggfunc='sum', fill_value=0)
-        elif '収入' in df.index.names:
+        elif '収入' in df.columns:
             pivot_df = df.pivot_table(index='月', columns='カテゴリ', values='収入', aggfunc='sum', fill_value=0)
         monthly_total = pivot_df.groupby('月').sum()
         monthly_total['合計'] = monthly_total.sum(axis=1)
