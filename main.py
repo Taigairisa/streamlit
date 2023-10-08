@@ -97,14 +97,14 @@ def sideThisMonthRatio():
     mixed_df['割合'] = mixed_df['支出'] / mixed_df['予算']
     return today, mixed_df.reindex(categories)
 
-@st.cache_resource(ttl = 600)
+@st.cache_resource(ttl = 600, show_spinner=False)
 def get_worksheet_from_gspread_client():
     credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
     gc = gspread.authorize(credentials)
     sh = gc.open_by_key(SHEET_KEY)
     return sh
 
-@st.cache_data(ttl = 120)
+@st.cache_data(ttl = 120, show_spinner=False)
 def get_dataframe_from_sheet(_sh, sheet_name):
     worksheet = _sh.worksheet(sheet_name)
     # worksheet = get_worksheet(_gc, sheet_name)
@@ -230,18 +230,22 @@ elif view_category == "データ一覧":
     elif "カテゴリー別支出" in shown_data:
         # 支出テーブルのみから集めたdf
         df = st.session_state["df_expenses"]
-        selected_month = st.select_slider("月を選択してください", list(df['月'].unique())) 
-        filtered_df = df[df['月'] == selected_month]
-        st.subheader(f"{selected_month}の各カテゴリーごとの支出")
-        category_summary = filtered_df.groupby('カテゴリ')['支出'].sum().reset_index()
-        bars = (
-            alt.Chart(category_summary)
-            .mark_bar()
-            .encode(x="カテゴリ:N",y=alt.Y("支出:Q"),color="カテゴリ:N",)
-        )
+        pivot_df = get_pivot_df(df)
+        st.line_chart(pivot_df)
 
-        st.altair_chart(bars, use_container_width=True)
-        st.dataframe(filtered_df)
+        if st.button("月別に表示する"):
+            selected_month = st.select_slider("月を選択してください", list(df['月'].unique())) 
+            filtered_df = df[df['月'] == selected_month]
+            st.subheader(f"{selected_month}の各カテゴリーごとの支出")
+            category_summary = filtered_df.groupby('カテゴリ')['支出'].sum().reset_index()
+            bars = (
+                alt.Chart(category_summary)
+                .mark_bar()
+                .encode(x="カテゴリ:N",y=alt.Y("支出:Q"),color="カテゴリ:N",)
+            )
+
+            st.altair_chart(bars, use_container_width=True)
+            st.dataframe(filtered_df)
 
     elif "収入推移" in shown_data:
         pivot_df = get_pivot_df(st.session_state["df_income"])
