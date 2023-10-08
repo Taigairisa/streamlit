@@ -190,13 +190,11 @@ if view_category == "入力フォーム":
         copyDataToBudgetSheet(question_categories, worksheet)
 
     if submitted:
-        with st.spinner("データ更新中..."):
-            time.sleep(1.5)
-
         copyDataToBudgetSheet(questions, worksheet, True)
-        result = pd.DataFrame([[category, answer] for category, answer in zip(question_categories, questions)]).set_index(0).T
-        result.index = ["送信したデータ"]
-        st.write(result)
+        st.session_state.result = pd.DataFrame([[category, answer] for category, answer in zip(question_categories, questions)]).set_index(0).T
+        st.session_state.result.index = ["送信したデータ"]
+        st.write(st.session_state.result)
+        time.sleep(1.5)
         cache_clear()
         st.rerun()
         # st.write("<script>window.location.reload();</script>", unsafe_allow_html=True)
