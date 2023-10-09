@@ -229,13 +229,18 @@ elif view_category == "データ一覧":
         # 支出テーブルのみから集めたdf
         df = st.session_state["df_expenses"]
         pivot_df = get_pivot_df(df)
-        st.line_chart(pivot_df)
+        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_df = pivot_df[selected_category] 
+        st.dataframe(selected_df.T)
+        st.line_chart(selected_df)
 
         if st.checkbox("月別に表示する"):
-            selected_month = st.select_slider("月を選択してください", list(df['月'].unique())) 
+            selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
             filtered_df = df[df['月'] == selected_month]
+            # st.dataframe(filtered_df)
             st.subheader(f"{selected_month}の各カテゴリーごとの支出")
             category_summary = filtered_df.groupby('カテゴリ')['支出'].sum().reset_index()
+            st.dataframe(category_summary)
             bars = (
                 alt.Chart(category_summary)
                 .mark_bar()
@@ -246,16 +251,71 @@ elif view_category == "データ一覧":
             st.dataframe(filtered_df)
 
     elif "収入推移" in shown_data:
-        pivot_df = get_pivot_df(st.session_state["df_income"])
-        st.line_chart(pivot_df)
+        df = st.session_state["df_income"]
+        pivot_df = get_pivot_df(df)
+        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_df = pivot_df[selected_category] 
+        st.dataframe(selected_df.T)
+        st.line_chart(selected_df)
+        
+        if st.checkbox("月別に表示する"):
+            selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
+            filtered_df = df[df['月'] == selected_month]
+            st.subheader(f"{selected_month}の各カテゴリーごとの収入")
+            category_summary = filtered_df.groupby('カテゴリ')['収入'].sum().reset_index()
+            bars = (
+                alt.Chart(category_summary)
+                .mark_bar()
+                .encode(x="カテゴリ:N",y=alt.Y("収入:Q"),color="カテゴリ:N",)
+            )
+
+            st.altair_chart(bars, use_container_width=True)
+            st.dataframe(filtered_df)
 
     elif "定期契約推移" in shown_data:
-        pivot_df = get_pivot_df(st.session_state["df_subscription"])
-        st.line_chart(pivot_df)
+        df = st.session_state["df_subscription"]
+        pivot_df = get_pivot_df(df)
+        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_df = pivot_df[selected_category] 
+        st.dataframe(selected_df.T)
+        st.line_chart(selected_df)
+
+        if st.checkbox("月別に表示する"):
+            selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
+            filtered_df = df[df['月'] == selected_month]
+            st.subheader(f"{selected_month}の各カテゴリーごとの収入")
+            category_summary = filtered_df.groupby('カテゴリ')['支出'].sum().reset_index()
+            bars = (
+                alt.Chart(category_summary)
+                .mark_bar()
+                .encode(x="カテゴリ:N",y=alt.Y("支出:Q"),color="カテゴリ:N",)
+            )
+
+            st.altair_chart(bars, use_container_width=True)
+            st.dataframe(filtered_df)
 
     elif "特別支出推移" in shown_data:
-        pivot_df = get_pivot_df(st.session_state["df_special"])
-        st.line_chart(pivot_df)
+        df = st.session_state["df_special"]
+        st.dataframe(df)
+        pivot_df = get_pivot_df(df)
+        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_df = pivot_df[selected_category] 
+        st.dataframe(selected_df.T)
+        st.line_chart(selected_df)
+
+        if st.checkbox("月別に表示する"):
+            selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
+            filtered_df = df[df['月'] == selected_month]
+            st.subheader(f"{selected_month}の各カテゴリーごとの収入")
+            category_summary = filtered_df.groupby('カテゴリ')['支出'].sum().reset_index()
+            bars = (
+                alt.Chart(category_summary)
+                .mark_bar()
+                .encode(x="カテゴリ:N",y=alt.Y("支出:Q"),color="カテゴリ:N",)
+            )
+
+            st.altair_chart(bars, use_container_width=True)
+            st.dataframe(filtered_df)
 
     elif "旅行別" in shown_data:
         df = st.session_state["df_travel"]
