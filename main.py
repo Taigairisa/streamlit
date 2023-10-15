@@ -11,8 +11,24 @@ def copyDataToBudgetSheet(questions, sheet, lastRow = False):
     if lastRow:
         sheet.append_row(questions)
     else:
-        for num, question in enumerate(questions):
-            sheet.update_cell(1, num + 1, question)
+        sheet.append_row(questions)
+
+def split_and_insert_data(questions, sheet, split_months):
+    amount = int(questions[3])
+    split_amount = amount // split_months
+    date = datetime.datetime.strptime(questions[0], "%Y-%m-%d")
+    category = questions[1]
+    description = questions[2]
+
+    for i in range(split_months):
+        if i == split_months -1:
+            split_amount += amount % split_months
+        # print(date)
+        sheet.append_row([str(date.strftime('%Y/%m/%d %H:%M:%S')), category, description, split_amount])
+        if date.month == 12:
+            date = date.replace(day=1, month=1)
+        else:
+            date = date.replace(day=1, month=date.month + 1)
 
 def is_worksheet_empty(worksheet):
     cell_list = worksheet.get_all_values()
@@ -55,9 +71,23 @@ def makeTravelForm(question_categories):
         submitted = st.form_submit_button("送信")
     return questions, submitted
 
+def makeSplitForm(categories, question_categories):
+    with st.form("my_form", clear_on_submit=True):
+        date = st.date_input(question_categories[0]+ ":red[ *]")
+        category = st.selectbox(label=question_categories[1]+ ":red[ *]", options=categories)
+        description = st.text_input(label=question_categories[2])
+        money = st.text_input(question_categories[3]+ ":red[ *]")
+        split_months = st.number_input("何か月分割しますか？"+ ":red[ *]", value=2, min_value=2, max_value=24)
+        questions = [date.isoformat(), category, description, (money)]
+        submitted = st.form_submit_button("送信")
+    return questions, submitted, split_months
+
 def get_question_categories(input_category):
     if input_category == "支出":
         question_categories = ["日付", "カテゴリ", "詳細", "支出"]
+        categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
+    if input_category == "支出分割払い":
+        question_categories = ["日付", "カテゴリ", "詳細", "支出", "分割月"]
         categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
     elif input_category == "収入":
         question_categories = ["日付", "カテゴリ", "詳細", "収入"]
@@ -173,7 +203,7 @@ if view_category == "入力フォーム":
 
     st.title("家計簿入力")
     
-    input_category = st.selectbox(label="入力フォーム変更", options=["支出","収入","定期契約","特別支出","旅行","予算","残高"])
+    input_category = st.selectbox(label="入力フォーム変更", options=["支出","収入","定期契約","特別支出","支出分割払い","旅行","予算","残高"])
     question_categories, categories = get_question_categories(input_category)
 
     if input_category in ["支出", "収入", "定期契約", "特別支出", "残高"]:
@@ -185,6 +215,9 @@ if view_category == "入力フォーム":
     elif input_category == "予算":
         questions, submitted = makeBudgetForm(categories, question_categories)
         SP_SHEET = input_category
+    elif input_category == "支出分割払い":
+        questions, submitted, split_months = makeSplitForm(categories, question_categories)
+        SP_SHEET = "支出"
 
     worksheet = sh.worksheet(SP_SHEET)
 
@@ -195,6 +228,20 @@ if view_category == "入力フォーム":
     if submitted:
         if questions[3] == "":
             st.error("金額を入力してください。")
+        # elif int(questions[3]) >= 10000:
+        #     st.info("金額が大きいです。分割入力を行います。")
+        #     split_months = st.number_input("何か月分割しますか？", value=1, min_value=1, max_value=24)
+            
+        elif input_category == "支出分割払い":
+            split_and_insert_data(questions, worksheet, split_months)
+            st.session_state.result = pd.DataFrame([[category, answer] for category, answer in zip(question_categories, questions)]).set_index(0).T
+            st.session_state.result.index = ["送信したデータ"]
+            st.write(split_months)
+            st.write(st.session_state.result)
+            st.success("送信しました")
+            time.sleep(1.5)
+            cache_clear()
+            st.rerun()
         else:
         
             copyDataToBudgetSheet(questions, worksheet, True)
