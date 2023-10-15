@@ -27,10 +27,10 @@ def convert_column_to_integer(df, column_name):
 
 def makeForm(categories, question_categories):
     with st.form("my_form", clear_on_submit=True):
-        date = st.date_input(question_categories[0])
-        category = st.selectbox(label=question_categories[1], options=categories)
+        date = st.date_input(question_categories[0]+ ":red[ *]")
+        category = st.selectbox(label=question_categories[1]+ ":red[ *]", options=categories)
         description = st.text_input(label=question_categories[2])
-        money = st.text_input(question_categories[3])
+        money = st.text_input(question_categories[3]+ ":red[ *]")
         questions = [date.isoformat(), category, description, (money)]
         submitted = st.form_submit_button("送信")
     return questions, submitted
@@ -115,7 +115,6 @@ def get_dataframe_from_sheet(_sh, sheet_name):
     convert_column_to_integer(df,"収支")
     convert_column_to_integer(df,"予算")
 
-    # 日付列を日付型に変換
     df['日付'] = pd.to_datetime(df['日付'], format='ISO8601')
     df['月'] = df['日付'].dt.strftime('%Y/%m')
     return df
@@ -138,8 +137,12 @@ def side_bar():
         st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
         for index, row in mixed_df.iterrows():
             if row['割合'] >= 1:
-                st.write('限度額を超えています!')
-                st.progress(100, text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
+                st.write(':red[限度額を超えています!]')
+                st.progress(100, text=f"{index}：:red[{int(row['支出'])}円] / {int(row['予算'])}円")
+            elif row['割合'] >= 0.8:
+                st.progress(row['割合'], text=f"{index}：:red[{int(row['支出'])}円] / {int(row['予算'])}円")
+            elif row['割合'] >= 0.5:
+                st.progress(row['割合'], text=f"{index}：:orange[{int(row['支出'])}円] / {int(row['予算'])}円")
             else:
                 st.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
 
@@ -190,14 +193,18 @@ if view_category == "入力フォーム":
         copyDataToBudgetSheet(question_categories, worksheet)
 
     if submitted:
-        copyDataToBudgetSheet(questions, worksheet, True)
-        st.session_state.result = pd.DataFrame([[category, answer] for category, answer in zip(question_categories, questions)]).set_index(0).T
-        st.session_state.result.index = ["送信したデータ"]
-        st.write(st.session_state.result)
-        time.sleep(1.5)
-        cache_clear()
-        st.rerun()
-        # st.write("<script>window.location.reload();</script>", unsafe_allow_html=True)
+        if questions[3] == "":
+            st.error("金額を入力してください。")
+        else:
+        
+            copyDataToBudgetSheet(questions, worksheet, True)
+            st.session_state.result = pd.DataFrame([[category, answer] for category, answer in zip(question_categories, questions)]).set_index(0).T
+            st.session_state.result.index = ["送信したデータ"]
+            st.write(st.session_state.result)
+            st.success("送信しました")
+            time.sleep(1.5)
+            cache_clear()
+            st.rerun()
 
 elif view_category == "データ一覧":
     
@@ -214,16 +221,21 @@ elif view_category == "データ一覧":
         df_income = st.session_state["df_income"]
         df_transition = pd.concat([df_expenses, df_income]).fillna(0)
         df_transition['収支'] = df_transition["収入"]-df_transition["支出"]
+
         pivot_df = df_transition.pivot_table(index='月', values='収支', aggfunc='sum', fill_value=0).reset_index()
-        
+        previous_month_end_balance = 0
+        for index, row in pivot_df.iterrows():
+            pivot_df.at[index, '収支'] += previous_month_end_balance
+            previous_month_end_balance = pivot_df.at[index, '収支']  
+
         df_balance = get_dataframe_from_sheet(sh, "残高")
         today = datetime.date.today()
         this_month = today.strftime('%Y/%m')
         df_balance_today = df_balance[df_balance["月"]==this_month]
         balance_value_today = df_balance_today["残高"].astype(int).sum()
 
-        pivot_df['収支'] = pivot_df["収支"] + balance_value_today
-        st.line_chart(pivot_df.set_index('月'))
+        pivot_df['収支'] += balance_value_today
+        st.line_chart(pivot_df.set_index('月')) 
 
     elif "カテゴリー別支出" in shown_data:
         # 支出テーブルのみから集めたdf
