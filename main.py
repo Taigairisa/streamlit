@@ -26,7 +26,7 @@ def split_and_insert_data(questions, sheet, split_months):
         # print(date)
         sheet.append_row([str(date.strftime('%Y/%m/%d %H:%M:%S')), category, description, split_amount])
         if date.month == 12:
-            date = date.replace(day=1, month=1)
+            date = date.replace(day=1, month=1, year = date.year + 1)
         else:
             date = date.replace(day=1, month=date.month + 1)
 
@@ -161,7 +161,7 @@ def reflect_all_data(sh):
 
 def side_bar():
     with st.sidebar:
-        view_category = st.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ削除"])
+        view_category = st.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ編集"])
         st.markdown("---")
         today, mixed_df = sideThisMonthRatio()
         st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
@@ -228,9 +228,6 @@ if view_category == "入力フォーム":
     if submitted:
         if questions[3] == "":
             st.error("金額を入力してください。")
-        # elif int(questions[3]) >= 10000:
-        #     st.info("金額が大きいです。分割入力を行います。")
-        #     split_months = st.number_input("何か月分割しますか？", value=1, min_value=1, max_value=24)
             
         elif input_category == "支出分割払い":
             split_and_insert_data(questions, worksheet, split_months)
@@ -243,7 +240,6 @@ if view_category == "入力フォーム":
             cache_clear()
             st.rerun()
         else:
-        
             copyDataToBudgetSheet(questions, worksheet, True)
             st.session_state.result = pd.DataFrame([[category, answer] for category, answer in zip(question_categories, questions)]).set_index(0).T
             st.session_state.result.index = ["送信したデータ"]
@@ -282,16 +278,54 @@ elif view_category == "データ一覧":
         balance_value_today = df_balance_today["残高"].astype(int).sum()
 
         pivot_df['収支'] += balance_value_today
-        st.line_chart(pivot_df.set_index('月')) 
+        months = list(sorted(pivot_df['月'].unique()))
+        xmin, xmax = st.select_slider("月を指定",months,value=(months[0],months[-1]))
+        ymin, ymax = st.slider("範囲を指定",0,12000000,(0,12000000))
+        xmin_index = months.index(xmin)
+        xmax_index = months.index(xmax)
+        selected_months = months[xmin_index:xmax_index + 1]
+        pivot_df = pivot_df[pivot_df['月'].isin(selected_months)]
+        st.dataframe(pivot_df.set_index('月').T)
+        chart = (
+            alt.Chart(pivot_df)
+            .mark_line(opacity=0.8, clip=True)
+            .encode(
+                x=alt.X("月:O"), 
+                y=alt.Y("収支:Q", scale=alt.Scale(domain=[ymin, ymax])) #
+            )
+        )
+        st.altair_chart(chart, use_container_width=True)
 
     elif "カテゴリー別支出" in shown_data:
         # 支出テーブルのみから集めたdf
         df = st.session_state["df_expenses"]
         pivot_df = get_pivot_df(df)
-        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_category = st.multiselect('グラフに表示するカテゴリーを選択', list(pivot_df.columns), default = "合計")
         selected_df = pivot_df[selected_category] 
+
         st.dataframe(selected_df.T)
-        st.line_chart(selected_df)
+
+        selected_df = selected_df.reset_index()
+        months = list(sorted(selected_df['月'].unique()))
+        xmin, xmax = st.select_slider("月を指定",months,value=(months[0],months[-1]))
+        xmin_index = months.index(xmin)
+        xmax_index = months.index(xmax)
+        selected_months = months[xmin_index:xmax_index + 1]
+        selected_df = selected_df[selected_df['月'].isin(selected_months)]
+        selected_df = selected_df.melt('月').rename(
+            columns={'variable': 'カテゴリ','value':'収支'}
+        )
+
+        chart = (
+            alt.Chart(selected_df)
+            .mark_line(opacity=0.8, clip=True)
+            .encode(
+                x=alt.X("月:O"), 
+                y=alt.Y("収支:Q"),
+                color="カテゴリ:N"
+            )
+        )
+        st.altair_chart(chart, use_container_width=True)
 
         if st.checkbox("月別に表示する"):
             selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
@@ -312,10 +346,30 @@ elif view_category == "データ一覧":
     elif "収入推移" in shown_data:
         df = st.session_state["df_income"]
         pivot_df = get_pivot_df(df)
-        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_category = st.multiselect('グラフに表示するカテゴリーを選択', list(pivot_df.columns), default = "合計")
         selected_df = pivot_df[selected_category] 
         st.dataframe(selected_df.T)
-        st.line_chart(selected_df)
+        selected_df = selected_df.reset_index()
+        months = list(sorted(selected_df['月'].unique()))
+        xmin, xmax = st.select_slider("月を指定",months,value=(months[0],months[-1]))
+        xmin_index = months.index(xmin)
+        xmax_index = months.index(xmax)
+        selected_months = months[xmin_index:xmax_index + 1]
+        selected_df = selected_df[selected_df['月'].isin(selected_months)]
+        selected_df = selected_df.melt('月').rename(
+            columns={'variable': 'カテゴリ','value':'収支'}
+        )
+
+        chart = (
+            alt.Chart(selected_df)
+            .mark_line(opacity=0.8, clip=True)
+            .encode(
+                x=alt.X("月:O"), 
+                y=alt.Y("収支:Q"),
+                color="カテゴリ:N"
+            )
+        )
+        st.altair_chart(chart, use_container_width=True)
         
         if st.checkbox("月別に表示する"):
             selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
@@ -334,10 +388,31 @@ elif view_category == "データ一覧":
     elif "定期契約推移" in shown_data:
         df = st.session_state["df_subscription"]
         pivot_df = get_pivot_df(df)
-        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_category = st.multiselect('グラフに表示するカテゴリーを選択', list(pivot_df.columns), default = "合計")
         selected_df = pivot_df[selected_category] 
         st.dataframe(selected_df.T)
-        st.line_chart(selected_df)
+        selected_df = selected_df.reset_index()
+        months = list(sorted(selected_df['月'].unique()))
+        xmin, xmax = st.select_slider("月を指定",months,value=(months[0],months[-1]))
+        xmin_index = months.index(xmin)
+        xmax_index = months.index(xmax)
+        selected_months = months[xmin_index:xmax_index + 1]
+        selected_df = selected_df[selected_df['月'].isin(selected_months)]
+        selected_df = selected_df.melt('月').rename(
+            columns={'variable': 'カテゴリ','value':'収支'}
+        )
+
+        chart = (
+            alt.Chart(selected_df)
+            .mark_line(opacity=0.8, clip=True)
+            .encode(
+                x=alt.X("月:O"), 
+                y=alt.Y("収支:Q"),
+                color="カテゴリ:N"
+            )
+        )
+        st.altair_chart(chart, use_container_width=True)
+        
 
         if st.checkbox("月別に表示する"):
             selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
@@ -357,10 +432,31 @@ elif view_category == "データ一覧":
         df = st.session_state["df_special"]
         st.dataframe(df)
         pivot_df = get_pivot_df(df)
-        selected_category = st.multiselect('グラフに表示する国を選択', list(pivot_df.columns), default = "合計")
+        selected_category = st.multiselect('グラフに表示するカテゴリーを選択', list(pivot_df.columns), default = "合計")
         selected_df = pivot_df[selected_category] 
         st.dataframe(selected_df.T)
-        st.line_chart(selected_df)
+        selected_df = selected_df.reset_index()
+        months = list(sorted(selected_df['月'].unique()))
+        xmin, xmax = st.select_slider("月を指定",months,value=(months[0],months[-1]))
+        xmin_index = months.index(xmin)
+        xmax_index = months.index(xmax)
+        selected_months = months[xmin_index:xmax_index + 1]
+        selected_df = selected_df[selected_df['月'].isin(selected_months)]
+        selected_df = selected_df.melt('月').rename(
+            columns={'variable': 'カテゴリ','value':'収支'}
+        )
+
+        chart = (
+            alt.Chart(selected_df)
+            .mark_line(opacity=0.8, clip=True)
+            .encode(
+                x=alt.X("月:O"), 
+                y=alt.Y("収支:Q"),
+                color="カテゴリ:N"
+            )
+        )
+        st.altair_chart(chart, use_container_width=True)
+        
 
         if st.checkbox("月別に表示する"):
             selected_month = st.select_slider("月を選択してください", list(sorted(df['月'].unique())) )
@@ -387,7 +483,7 @@ elif view_category == "データ一覧":
         st.altair_chart(bars, use_container_width=True)
         st.dataframe(category_summary)
 
-elif view_category == "データ削除":
+elif view_category == "データ編集":
 
     input_category = st.selectbox(label="データを選択する",options=["支出","収入","定期契約","特別支出","旅行","予算","残高"])
     worksheet = sh.worksheet(input_category) 
