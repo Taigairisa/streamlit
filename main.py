@@ -121,10 +121,13 @@ def sideThisMonthRatio():
     categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
     
     df_used = getThisMonthSummary("支出", today)
-    df_budget = getThisMonthSummary("予算", today)
+    try:
+        df_budget = getThisMonthSummary("予算", today)
+        mixed_df = pd.concat([df_used,df_budget], axis=1).fillna(0)
+        mixed_df['割合'] = mixed_df['支出'] / mixed_df['予算']
+    except:
+        return today, 
 
-    mixed_df = pd.concat([df_used,df_budget], axis=1).fillna(0)
-    mixed_df['割合'] = mixed_df['支出'] / mixed_df['予算']
     return today, mixed_df.reindex(categories)
 
 @st.cache_resource(ttl = 600, show_spinner=False)
@@ -163,8 +166,10 @@ def side_bar():
     with st.sidebar:
         view_category = st.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ編集"])
         st.markdown("---")
-        try:
-            today, mixed_df = sideThisMonthRatio()
+        today, mixed_df = sideThisMonthRatio()
+        if mixed_df.isnull().any().any() == True:
+            st.error(f" {today.month}月分 の【予算】を入力してください")
+        else:
             st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
             for index, row in mixed_df.iterrows():
                 if row['割合'] >= 1:
@@ -176,9 +181,8 @@ def side_bar():
                     st.progress(row['割合'], text=f"{index}：:orange[{int(row['支出'])}円] / {int(row['予算'])}円")
                 else:
                     st.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
-        except:
-            today, mixed_df = sideThisMonthRatio()
-            st.error(f" {today.month}月分 の【予算】を入力してください")
+
+                today, mixed_df = sideThisMonthRatio()
 
     return view_category
 
