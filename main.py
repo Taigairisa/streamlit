@@ -163,18 +163,22 @@ def side_bar():
     with st.sidebar:
         view_category = st.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ編集"])
         st.markdown("---")
-        today, mixed_df = sideThisMonthRatio()
-        st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
-        for index, row in mixed_df.iterrows():
-            if row['割合'] >= 1:
-                st.write(':red[限度額を超えています!]')
-                st.progress(100, text=f"{index}：:red[{int(row['支出'])}円] / {int(row['予算'])}円")
-            elif row['割合'] >= 0.8:
-                st.progress(row['割合'], text=f"{index}：:red[{int(row['支出'])}円] / {int(row['予算'])}円")
-            elif row['割合'] >= 0.5:
-                st.progress(row['割合'], text=f"{index}：:orange[{int(row['支出'])}円] / {int(row['予算'])}円")
-            else:
-                st.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
+        try:
+            today, mixed_df = sideThisMonthRatio()
+            st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
+            for index, row in mixed_df.iterrows():
+                if row['割合'] >= 1:
+                    st.write(':red[限度額を超えています!]')
+                    st.progress(100, text=f"{index}：:red[{int(row['支出'])}円] / {int(row['予算'])}円")
+                elif row['割合'] >= 0.8:
+                    st.progress(row['割合'], text=f"{index}：:red[{int(row['支出'])}円] / {int(row['予算'])}円")
+                elif row['割合'] >= 0.5:
+                    st.progress(row['割合'], text=f"{index}：:orange[{int(row['支出'])}円] / {int(row['予算'])}円")
+                else:
+                    st.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
+        except:
+            today, mixed_df = sideThisMonthRatio()
+            st.error(f" {today.month}月分 の【予算】を入力してください")
 
     return view_category
 
