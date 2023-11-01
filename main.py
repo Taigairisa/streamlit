@@ -54,7 +54,7 @@ def makeForm(categories, question_categories):
 def makeBudgetForm(categories, question_categories):
     with st.form("my_form", clear_on_submit=True):
         date = st.date_input(question_categories[0])
-        month = st.selectbox(label=question_categories[1], options=list(range(1, 13)))
+        month = 0 #st.selectbox(label=question_categories[1], options=list(range(1, 13)))
         category = st.selectbox(label=question_categories[2], options=categories)
         money = st.text_input(question_categories[3])
         questions = [date.isoformat(), month, category, (money)]
@@ -162,16 +162,21 @@ def reflect_all_data(sh):
     st.session_state["df_special"] = get_dataframe_from_sheet(sh, "特別支出")
     st.session_state["df_travel"] = get_dataframe_from_sheet(sh, "旅行")
 
+import math
+
 def side_bar():
     with st.sidebar:
         view_category = st.selectbox(label="ページ変更", options=["入力フォーム","データ一覧","データ編集"])
         st.markdown("---")
         today, mixed_df = sideThisMonthRatio()
-        if mixed_df.isnull().any().any() == True:
+        if mixed_df["予算"].isnull().any() == True:
             st.error(f" {today.month}月分 の【予算】を入力してください")
         else:
             st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
             for index, row in mixed_df.iterrows():
+                if math.isnan(row["割合"]):
+                    row["割合"] = 0
+
                 if row['割合'] >= 1:
                     st.write(':red[限度額を超えています!]')
                     st.progress(100, text=f"{index}：:red[{int(row['支出'])}円] / {int(row['予算'])}円")
