@@ -97,7 +97,7 @@ def get_question_categories(input_category):
         categories = ["家賃", "電気代","ガス代","通信代", "サブスク","積み立て投資","その他"]
     elif input_category == "特別支出":
         question_categories = ["日付", "カテゴリ", "詳細", "支出"]
-        categories = ["病院", "イベント", "引っ越し" "贈与", "その他"]
+        categories = ["病院", "イベント", "引っ越し" ,"贈与", "その他"]
     elif input_category == "旅行":
         question_categories = ["日付", "場所", "詳細", "支出"]
         categories = []
