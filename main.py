@@ -106,7 +106,7 @@ def get_question_categories(input_category):
         categories = ["三井住友", "京都信用金庫", "楽天銀行", "楽天証券", "JAバンク", "ゆうちょ", "松井バンク", "松井証券"]
     elif input_category == "予算":
         question_categories = ["日付", "月", "カテゴリ", "予算"]
-        categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
+        categories = ["食費/消耗品", "二人で遊ぶお金", "大河お小遣い", "幸華お小遣い","引っ越し"]
     return question_categories, categories
 
 def getThisMonthSummary(category, date):
@@ -118,7 +118,7 @@ def getThisMonthSummary(category, date):
 
 def sideThisMonthRatio():
     today = datetime.date.today()
-    categories = ["食費/消耗品", "耐久消耗品","二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
+    categories = ["食費/消耗品", "二人で遊ぶお金", "大河お小遣い", "幸華お小遣い","引っ越し"]
     
     df_used = getThisMonthSummary("支出", today)
     try:
