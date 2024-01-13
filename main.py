@@ -105,8 +105,8 @@ def get_question_categories(input_category):
         question_categories = ["日付", "口座", "詳細","残高"]
         categories = ["三井住友", "京都信用金庫", "楽天銀行", "楽天証券", "JAバンク", "ゆうちょ", "松井バンク", "松井証券"]
     elif input_category == "予算":
-        question_categories = ["日付", "月", "カテゴリ", "予算"]
-        categories = ["食費/消耗品", "二人で遊ぶお金", "大河お小遣い", "幸華お小遣い","引っ越し"]
+        question_categories = ["日付", "月", "カテゴリ", "旅行"]
+        categories = ["食費/消耗品", "二人で遊ぶお金", "大河お小遣い", "幸華お小遣い","引っ越し","旅行"]
     return question_categories, categories
 
 def getThisMonthSummary(category, date):
@@ -130,14 +130,6 @@ def sideThisMonthRatio():
         return today, 
 
     return today, mixed_df.reindex(categories)
-
-def sideMoveRatio():
-    df_move1 = get_dataframe_from_sheet(sh,"特別支出")
-    df_move = df_move1.groupby('カテゴリ')["引っ越し"].sum().reset_index().set_index("カテゴリ")
-    df_budget = get_dataframe_from_sheet(sh,"予算")["引っ越し"].sum().reset_index().set_index("カテゴリ")
-    mixed_df = pd.concat([df_move,df_budget], axis=1).fillna(0)
-    mixed_df['割合'] = mixed_df['支出'] / mixed_df['予算']
-    return mixed_df
 
 @st.cache_resource(ttl = 600, show_spinner=False)
 def get_worksheet_from_gspread_client():
@@ -197,6 +189,31 @@ def side_bar():
                     st.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
 
                 today, mixed_df = sideThisMonthRatio()
+            st.write("---")
+            today = datetime.date.today()
+            this_year = int(today.strftime('%Y'))
+            st.write(f"{this_year}年の旅行支出")
+            df_travel = get_dataframe_from_sheet(sh,"旅行")
+            df_travel['日付'] = pd.to_datetime(df_travel['日付'])
+            this_year_travel = df_travel[df_travel['日付'].dt.year == this_year]
+            total_expense_for_travel = this_year_travel['支出'].sum()
+            df_budget = get_dataframe_from_sheet(sh,"予算")
+            total_budget_for_travel = df_budget[df_budget['カテゴリ'] == '旅行']['予算'].sum()
+            travel_ratio = total_expense_for_travel/total_budget_for_travel
+
+            if math.isnan(travel_ratio):
+                travel_ratio = 0
+
+            if travel_ratio >= 1:
+                st.write(':red[限度額を超えています!]')
+                st.progress(100, text=f"旅行合計：:red[{int(total_expense_for_travel)}円] / {int(total_budget_for_travel)}円")
+            elif travel_ratio >= 0.8:
+                st.progress(travel_ratio, text=f"旅行合計：:red[{int(total_expense_for_travel)}円] / {int(total_budget_for_travel)}円")
+            elif travel_ratio >= 0.5:
+                st.progress(travel_ratio, text=f"旅行合計：:orange[{int(total_expense_for_travel)}円] / {int(total_budget_for_travel)}円")
+            else:
+                st.progress(travel_ratio, text=f"旅行合計：{int(total_expense_for_travel)}円 / {int(total_budget_for_travel)}円")
+            
             st.write("---")
             st.write("引っ越しの合計支出")
             df_move = get_dataframe_from_sheet(sh,"特別支出")
