@@ -118,9 +118,10 @@ def getThisMonthSummary(category, date):
 
 def sideThisMonthRatio():
     today = datetime.date.today()
-    categories = ["食費/消耗品", "二人で遊ぶお金", "大河お小遣い", "幸華お小遣い","引っ越し"]
+    categories = ["食費/消耗品", "二人で遊ぶお金", "大河お小遣い", "幸華お小遣い"]
     
     df_used = getThisMonthSummary("支出", today)
+
     try:
         df_budget = getThisMonthSummary("予算", today)
         mixed_df = pd.concat([df_used,df_budget], axis=1).fillna(0)
@@ -129,6 +130,14 @@ def sideThisMonthRatio():
         return today, 
 
     return today, mixed_df.reindex(categories)
+
+def sideMoveRatio():
+    df_move1 = get_dataframe_from_sheet(sh,"特別支出")
+    df_move = df_move1.groupby('カテゴリ')["引っ越し"].sum().reset_index().set_index("カテゴリ")
+    df_budget = get_dataframe_from_sheet(sh,"予算")["引っ越し"].sum().reset_index().set_index("カテゴリ")
+    mixed_df = pd.concat([df_move,df_budget], axis=1).fillna(0)
+    mixed_df['割合'] = mixed_df['支出'] / mixed_df['予算']
+    return mixed_df
 
 @st.cache_resource(ttl = 600, show_spinner=False)
 def get_worksheet_from_gspread_client():
@@ -188,6 +197,26 @@ def side_bar():
                     st.progress(row['割合'], text=f"{index}：{int(row['支出'])}円 / {int(row['予算'])}円")
 
                 today, mixed_df = sideThisMonthRatio()
+            st.write("---")
+            st.write("引っ越しの合計支出")
+            df_move = get_dataframe_from_sheet(sh,"特別支出")
+            total_expense_for_move = df_move[df_move['カテゴリ'] == '引っ越し']['支出'].sum()
+            df_budget = get_dataframe_from_sheet(sh,"予算")
+            total_budget_for_move = df_budget[df_budget['カテゴリ'] == '引っ越し']['予算'].sum()
+            move_ratio = total_expense_for_move/total_budget_for_move
+
+            if math.isnan(move_ratio):
+                move_ratio = 0
+
+            if move_ratio >= 1:
+                st.write(':red[限度額を超えています!]')
+                st.progress(100, text=f"引っ越し合計：:red[{int(total_expense_for_move)}円] / {int(total_budget_for_move)}円")
+            elif move_ratio >= 0.8:
+                st.progress(move_ratio, text=f"引っ越し合計：:red[{int(total_expense_for_move)}円] / {int(total_budget_for_move)}円")
+            elif move_ratio >= 0.5:
+                st.progress(move_ratio, text=f"引っ越し合計：:orange[{int(total_expense_for_move)}円] / {int(total_budget_for_move)}円")
+            else:
+                st.progress(move_ratio, text=f"引っ越し合計：{int(total_expense_for_move)}円 / {int(total_budget_for_move)}円")
 
     return view_category
 
