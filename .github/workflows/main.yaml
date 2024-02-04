@@ -11,15 +11,15 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
 
       - name: Check if the comment contains specific text
         run: |
-          comment_body=$(jq -r .comment.body issue_comment.json)
+          comment_body=${{ github.event.comment.body }}
           if [[ $comment_body == *"です"* ]]; then
             echo "Adding a reply..."
             # Replace the echo command with the command to add a reply comment
-            gh issue comment <ISSUE_NUMBER> -b "Thank you for your comment!"
+            gh issue comment ${{ github.event.issue.number }} -b "Thank you for your comment!"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
