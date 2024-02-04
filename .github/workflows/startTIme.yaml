@@ -22,7 +22,11 @@ jobs:
           # 「終了」というコメントが含まれているかチェック
             if [[ $comment_body == *"終了"* ]]; then
             echo "Adding a reply..."
-
+            comments=$(gh issue comments --issue "$NUMBER")
+            echo "All comments: $comments"
+            
+            start_comment=$(echo "$comments" | jq -r 'map(select(.body | contains("開始"))) | .[0].body')
+            echo "Start Comment: $start_comment"
             # 「開始」というコメントが含まれるコメントを探す
             # start_comment=$(gh issue comments --issue "$NUMBER" | python -c "import sys, json; data = json.load(sys.stdin); for comment in data: if '開始' in comment['body']: print(comment['body']); break")
             start_comment=$(gh issue comments --issue "$NUMBER" | jq -r 'map(select(.body | contains("開始"))) | .[0].body')
