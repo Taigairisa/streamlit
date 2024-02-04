@@ -1,0 +1,37 @@
+name: Comment on Issue
+
+on:
+  issue_comment:
+    types:
+      - created
+
+jobs:
+  comment-on-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check if the comment contains specific text
+        run: |
+          # コメント本文を取得
+          comment_body="${{ github.event.comment.body }}"
+
+          # 「終了」というコメントが含まれているかチェック
+          if [[ $comment_body == *"終了"* ]]; then
+            echo "Adding a reply..."
+
+            # 「開始」というコメントが含まれるコメントを探す
+            start_comment=$(gh issue comments --issue "$NUMBER" | grep -B 1 "開始" | head -n 1)
+
+            # 開始コメントの時刻を取得
+            start_time=$(echo "$start_comment" | jq -r '.created_at')
+
+            # 新しいコメントを追加
+            gh issue comment "$NUMBER" --body "新しいコメント - 開始コメントの時刻: $start_time"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUMBER: ${{ github.event.issue.number }}
