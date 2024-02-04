@@ -24,7 +24,7 @@ jobs:
             echo "Adding a reply..."
 
             # 「開始」というコメントが含まれるコメントを探す
-            start_comment=$(gh issue comments --issue "$NUMBER" | grep -B 1 "開始" | head -n 1)
+            start_comment=$(gh issue comments --issue "$NUMBER" | awk '/開始/ {print; getline; print}' | head -n 1)
             echo "Start Comment: $start_comment"
 
             # 開始コメントの時刻を取得
