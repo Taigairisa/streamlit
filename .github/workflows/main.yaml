@@ -1,0 +1,23 @@
+name: Calculate Issue Time
+
+on:
+  issue_comment:
+    types:
+      - created
+
+jobs:
+  calculate-time:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+
+      - name: Run script to calculate time
+        run: |
+          # Your script to parse comments and calculate time difference
+
+          # Example using a script (replace with your actual script)
+          python calculate_time.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
