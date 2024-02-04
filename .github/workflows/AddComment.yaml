@@ -11,7 +11,11 @@ jobs:
       issues: write
     steps:
       - name: Add comment
-        run: gh issue comment "$NUMBER" --body "$BODY"
+        
+        run: 
+          start_time=$(gh issue list --json id,title,labels,created_at | jq -r --arg issue_number "$ISSUE_NUMBER" '.[] | select(.number == ($NUMBER | tonumber)) | .created_at')
+          echo start_time
+          gh issue comment "$NUMBER" --body "$BODY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
