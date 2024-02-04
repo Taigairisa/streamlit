@@ -19,7 +19,7 @@ jobs:
           if [[ $comment_body == *"です"* ]]; then
             echo "Adding a reply..."
             # Replace the echo command with the command to add a reply comment
-            gh issue comment ${{ github.event.issue.number }} -b "Thank you for your comment!"
+            gh issue comment ${{ github.event.issue.number }} -b "Thank you for your comment!" -t ${{ secrets.TAIGA_SECRET }}
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
