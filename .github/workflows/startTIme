@@ -6,7 +6,7 @@ on:
       - created
 
 jobs:
-  comment-on-issue:
+  start-on-issue:
     runs-on: ubuntu-latest
     permissions:
       issues: write
