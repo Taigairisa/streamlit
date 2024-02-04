@@ -105,7 +105,7 @@ def get_question_categories(input_category):
         question_categories = ["日付", "口座", "詳細","残高"]
         categories = ["三井住友", "京都信用金庫", "楽天銀行", "楽天証券", "JAバンク", "ゆうちょ", "松井バンク", "松井証券"]
     elif input_category == "予算":
-        question_categories = ["日付", "月", "カテゴリ", "旅行"]
+        question_categories = ["日付", "月", "カテゴリ", "予算"]
         categories = ["食費/消耗品", "二人で遊ぶお金", "大河お小遣い", "幸華お小遣い","引っ越し","旅行"]
     return question_categories, categories
 
