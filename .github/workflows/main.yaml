@@ -8,7 +8,8 @@ on:
 jobs:
   comment-on-issue:
     runs-on: ubuntu-latest
-
+    permissions:
+      issues: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -19,7 +20,16 @@ jobs:
           if [[ $comment_body == *"です"* ]]; then
             echo "Adding a reply..."
             # Replace the echo command with the command to add a reply comment
-            gh issue comment ${{ github.event.issue.number }} -b "Thank you for your comment!"
+            gh issue comment "$NUMBER" --body "Thank you for your comment!"
           fi
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          BODY: >
+            This issue is available for anyone to work on.
+            **Make sure to reference this issue in your pull request.**
+            :sparkles: Thank you for your contribution! :sparkles:
+          
+          
