@@ -20,14 +20,16 @@ jobs:
           comment_body="${{ github.event.comment.body }}"
 
           # 「終了」というコメントが含まれているかチェック
-          if [[ $comment_body == *"終了"* ]]; then
+            if [[ $comment_body == *"終了"* ]]; then
             echo "Adding a reply..."
 
             # 「開始」というコメントが含まれるコメントを探す
             start_comment=$(gh issue comments --issue "$NUMBER" | grep -B 1 "開始" | head -n 1)
+            echo "Start Comment: $start_comment"
 
             # 開始コメントの時刻を取得
             start_time=$(echo "$start_comment" | jq -r '.created_at')
+            echo "Start Time: $start_time"
 
             # 新しいコメントを追加
             gh issue comment "$NUMBER" --body "新しいコメント - 開始コメントの時刻: $start_time"
