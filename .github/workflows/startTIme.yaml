@@ -22,7 +22,7 @@ jobs:
           # 「終了」というコメントが含まれているかチェック
             if [[ $comment_body == *"終了"* ]]; then
             echo "Adding a reply..."
-            comments=$(gh issue comment list --issue "$NUMBER")
+            comments=$(gh api repos/:owner/:repo/issues/:issue_number/comments)
             echo "All comments: $comments"
             
             start_comment=$(echo "$comments" | jq -r 'map(select(.body | contains("開始"))) | .[0].body')
