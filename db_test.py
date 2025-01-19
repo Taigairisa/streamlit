@@ -98,23 +98,20 @@ def get_sub_category_no(row):
     }
     return category_map.get(row["カテゴリ"], None)
 
-def load_data(conn):
+def load_data(conn, sub_category_id):
     query = """
         SELECT
             transactions.id,
-            main_categories.name AS main_category_name,
-            sub_categories.name AS sub_category_name,
             transactions.date,
             transactions.detail,
             transactions.type,
             transactions.amount
         FROM
             transactions
-        JOIN
-            sub_categories ON transactions.sub_category_id = sub_categories.id
-        JOIN
-            main_categories ON sub_categories.main_category_id = main_categories.id;
+        WHERE sub_category_id = %s;
     """
+    query = query % sub_category_id
+        
     try:
         df = pd.read_sql(query, conn)
         conn.close()   
@@ -219,18 +216,18 @@ with st.sidebar:
         st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
         st.progress(percentage / 100)
 
-if view_category == "追加":
-    conn = connect_db()
-    main_categories, sub_categories = get_categories(conn)
+today = date.today()
+conn = connect_db()
+main_categories, sub_categories = get_categories(conn)
+main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
+main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
+sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
+sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
 
-    st.title("データベースにデータを追加")
-    today = date.today()
+if view_category == "追加":
+
     date_range = [(today - timedelta(days=i)).strftime("%Y-%m-%d (%a)") for i in range(-31, 100)]
     selected_date = st.selectbox("日付", date_range, index=date_range.index(today.strftime("%Y-%m-%d (%a)")))
-    main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
-    main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
-    sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
-    sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
     input_type = st.selectbox("種別", ["支出", "収入", "予算"])
     detail = st.text_input("詳細")
     expense = st.number_input("支出額", min_value=0)
@@ -248,9 +245,17 @@ if view_category == "追加":
 
 if view_category == "編集":
     conn = connect_db()
-    df = load_data(conn)
-
-    st.title("データを編集")
+    df = load_data(conn, sub_category_id)
+    min_date = datetime.strptime(df['date'].min(), "%Y-%m-%d")
+    max_date = datetime.strptime(df['date'].max(), "%Y-%m-%d")
+    start_date, end_date = st.slider(
+        "日付範囲",
+        min_value=min_date,
+        max_value=max_date,
+        value=(min_date, max_date),
+        format="YYYY-MM-DD"
+    )
+    df = df[(df['date'] >= start_date.strftime("%Y-%m-%d")) & (df['date'] <= end_date.strftime("%Y-%m-%d"))]
 
     edited_df = st.data_editor(
         df,
