@@ -1,6 +1,7 @@
 from pathlib import Path
 import sqlite3
 from datetime import datetime
+from datetime import date
 import streamlit as st
 import pandas as pd
 from collections import defaultdict
@@ -221,61 +222,75 @@ if not exists_db_file():
     conn = connect_db()
     initialize_data(conn, sh)
 
-conn = connect_db()
-spent, budget = get_budget_and_spent(conn)
+with st.sidebar:
+    view_category = st.selectbox(label="ページ変更", options=["進捗","追加","編集"])
 
-st.title("データを編集")
-for category in budget.index:
-    spent_amount = spent.get(category, 0)
-    budget_amount = budget[category]
-    percentage = (spent_amount / budget_amount) * 100 if budget_amount > 0 else 0
-    st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
-    st.progress(percentage / 100)
-
-conn = connect_db()
-main_categories, sub_categories = get_categories(conn)
-
-# Streamlit UI
-st.title("データベースにデータを追加")
-date = st.date_input("日付", datetime.now())
-main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
-main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
-sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
-sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
-input_type = st.selectbox("種別", ["支出", "収入", "予算"])
-detail = st.text_input("詳細")
-expense = st.number_input("支出額", min_value=0)
-
-if st.button("データを追加"):
+if view_category == "進捗":
     conn = connect_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO transactions (sub_category_id, amount, type, date, detail)
-        VALUES (?, ?, ?, ?, ?);
-    """, (sub_category_id, expense, input_type, date.strftime("%Y-%m-%d"), detail))
-    conn.commit()
+    spent, budget = get_budget_and_spent(conn)
+    today = date.today()
+    st.title("今月の予算進捗")
+    st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
+    for category in budget.index:
+        spent_amount = spent.get(category, 0)
+        budget_amount = budget[category]
+        percentage = (spent_amount / budget_amount) * 100 if budget_amount > 0 else 0
 
-conn = connect_db()
-df = load_data(conn)
+        if percentage > 80:
+            st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
+        elif percentage > 50:
+            st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
+        else:
+            st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
+        st.progress(percentage / 100)
 
-st.title("データを編集")
+if view_category == "追加":
+    conn = connect_db()
+    main_categories, sub_categories = get_categories(conn)
 
-edited_df = st.data_editor(
-    df,
-    disabled=["id", "main_category_name", "sub_category_name","type"],
-    num_rows="dynamic",
-    column_config={
-        "amount": st.column_config.NumberColumn(format="¥%f"),
-    },
-    key="inventory_table",
-)
+    # Streamlit UI
+    st.title("データベースにデータを追加")
+    date = st.date_input("日付", datetime.now())
+    main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
+    main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
+    sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
+    sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
+    input_type = st.selectbox("種別", ["支出", "収入", "予算"])
+    detail = st.text_input("詳細")
+    expense = st.number_input("支出額", min_value=0)
 
-has_uncommitted_changes = any(len(v) for v in st.session_state.inventory_table.values())
+    if st.button("データを追加"):
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO transactions (sub_category_id, amount, type, date, detail)
+            VALUES (?, ?, ?, ?, ?);
+        """, (sub_category_id, expense, input_type, date.strftime("%Y-%m-%d"), detail))
+        conn.commit()
 
-st.button(
-    "Commit changes",
-    type="primary",
-    disabled=not has_uncommitted_changes,
-    on_click=update_data,
-    args=(df, st.session_state.inventory_table),
-)
+if view_category == "編集":
+    conn = connect_db()
+    df = load_data(conn)
+
+    st.title("データを編集")
+
+
+    edited_df = st.data_editor(
+        df,
+        disabled=["id", "main_category_name", "sub_category_name","type"],
+        num_rows="dynamic",
+        column_config={
+            "amount": st.column_config.NumberColumn(format="¥%f"),
+        },
+        key="inventory_table",
+    )
+
+    has_uncommitted_changes = any(len(v) for v in st.session_state.inventory_table.values())
+
+    st.button(
+        "Commit changes",
+        type="primary",
+        disabled=not has_uncommitted_changes,
+        on_click=update_data,
+        args=(df, st.session_state.inventory_table),
+    )
