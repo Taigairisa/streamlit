@@ -1,13 +1,11 @@
 from pathlib import Path
 import sqlite3
-from datetime import datetime
-from datetime import date
+from datetime import datetime, date, timedelta
 import streamlit as st
 import pandas as pd
 from collections import defaultdict
 from google.oauth2 import service_account
 import gspread
-import re
 
 SHEET_KEY = st.secrets.SP_SHEET_KEY.key
 SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -17,19 +15,15 @@ DB_FILENAME = Path(__file__).parent / "kakeibo.db"
 def get_worksheet_from_gspread_client():
     credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
     gc = gspread.authorize(credentials)
-    sh = gc.open_by_key(SHEET_KEY)
-    return sh
+    return gc.open_by_key(SHEET_KEY)
 
 def exists_db_file():
     return DB_FILENAME.exists()
 
 def connect_db():
-    """Connects to the sqlite database."""
-    conn = sqlite3.connect(DB_FILENAME)
-    return conn
+    return sqlite3.connect(DB_FILENAME)
 
 def initialize_data(conn, sh):
-    """Initializes the inventory table with some data."""
     cursor = conn.cursor()
     create_tables(cursor)
     insert_initial_categories(cursor)
@@ -72,11 +66,9 @@ def insert_initial_categories(cursor):
 def insert_initial_sub_categories(cursor):
     sub_categories = [
         (1, '二人で遊ぶお金'), (1, '食費・消耗品'), (1, '幸華お小遣い'), (1, '大河お小遣い'),
-        (2, '大河給与'), (2, '大河投資'), (2, '幸華給与'), (2, '幸華投資'), (2, '家賃'),
-        (2, 'ガス代'), (2, '電気代'), (2, '水道代'), (2, '通信代'), (2, 'サブスクリプション'),
-        (3, '贈与'), (3, '病院'), (3, '引っ越し'), (4, '202308イタリア'), (4, '202312オーストラリア'),
-        (4, '202312宇治'), (4, '202312大阪'), (4, '202403三重'), (4, '202408アメリカ'), (4, '202407京都'),
-        (4, '202407京都'), (3, 'イベント'), (3, 'スイッチOTC')
+        (2, '大河給与'), (2, '大河投資'), (2, '幸華給与'), (2, '幸華投資'), (2, '家賃'),(2, 'ガス代'), (2, '電気代'), (2, '水道代'), (2, '通信代'), (2, 'サブスクリプション'),
+        (3, '贈与'), (3, '病院'), (3, '引っ越し'), (3, 'イベント'), (3, 'スイッチOTC'), 
+        (4, '202308イタリア'), (4, '202312オーストラリア'),(4, '202312宇治'), (4, '202312大阪'), (4, '202403三重'), (4, '202408アメリカ'), (4, '202407京都'),
     ]
     cursor.executemany("INSERT INTO sub_categories (main_category_id, name) VALUES (?, ?);", sub_categories)
 
@@ -86,22 +78,14 @@ def insert_transactions_from_sheets(cursor, sh):
         worksheet = sh.worksheet(input_category)
         data = worksheet.get_all_values()
         df = pd.DataFrame(data[1:], columns=data[0])
-        input_type = get_input_type(input_category)
-        for index, row in df.iterrows():
+        input_type = "支出" if input_category in ["支出", "定期契約", "特別支出", "旅行"] else input_category
+        for _, row in df.iterrows():
             sub_category_no = get_sub_category_no(row)
             if sub_category_no:
                 cursor.execute("""
                     INSERT INTO transactions (sub_category_id, amount, type, date, detail)
                     VALUES (?, ?, ?, ?, ?);
                 """, (sub_category_no, row[input_type], input_type, datetime.strptime(row['日付'], "%Y/%m/%d").strftime("%Y-%m-%d"), row.get('詳細', "")))
-
-def get_input_type(input_category):
-    if input_category in ["支出", "定期契約", "特別支出", "旅行"]:
-        return "支出"
-    elif input_category == "収入":
-        return "収入"
-    elif input_category == "予算":
-        return "予算"
 
 def get_sub_category_no(row):
     category_map = {
@@ -115,7 +99,6 @@ def get_sub_category_no(row):
     return category_map.get(row["カテゴリ"], None)
 
 def load_data(conn):
-    """Loads the inventory data from the database."""
     query = """
         SELECT
             transactions.id,
@@ -140,7 +123,6 @@ def load_data(conn):
     return df
 
 def get_budget_and_spent(conn):
-    """Fetches the budget and spent amounts for the current month in the '日常' category from the database."""
     current_month = datetime.now().strftime("%Y-%m")
     query = f"""
         SELECT
@@ -175,8 +157,7 @@ def get_categories(conn):
 
 def update_data(df, changes):
     try:
-
-        conn = sqlite3.connect(DB_FILENAME)  # 新しいデータベース接続を作成
+        conn = sqlite3.connect(DB_FILENAME)
         cursor = conn.cursor()
 
         if changes["edited_rows"]:
@@ -184,7 +165,7 @@ def update_data(df, changes):
             rows = [defaultdict(lambda: None, dict(df.iloc[i].to_dict(), **delta)) for i, delta in deltas.items()]
             for row in rows:
                 if row['sub_category_id'] is None:
-                    row['sub_category_id'] = 1  # 適切なデフォルト値を設定
+                    row['sub_category_id'] = 1
             cursor.executemany("""
                 UPDATE transactions
                 SET
@@ -200,7 +181,7 @@ def update_data(df, changes):
             rows = [defaultdict(lambda: None, row) for row in changes["added_rows"]]
             for row in rows:
                 if row['sub_category_id'] is None:
-                    row['sub_category_id'] = 1  # 適切なデフォルト値を設定
+                    row['sub_category_id'] = 1
             cursor.executemany("""
                 INSERT INTO transactions
                     (sub_category_id, amount, type, date, detail)
@@ -211,8 +192,8 @@ def update_data(df, changes):
         if changes["deleted_rows"]:
             cursor.executemany("DELETE FROM transactions WHERE id = :id", ({"id": int(df.loc[i, "id"])} for i in changes["deleted_rows"]))
 
-            conn.commit()
-            conn.close()
+        conn.commit()
+        conn.close()
     except Exception as e:
         st.error(f"An error occurred: {e}")
 
@@ -223,9 +204,8 @@ if not exists_db_file():
     initialize_data(conn, sh)
 
 with st.sidebar:
-    view_category = st.selectbox(label="ページ変更", options=["進捗","追加","編集"])
+    view_category = st.selectbox(label="ページ変更", options=["追加","編集"])
 
-if view_category == "進捗":
     conn = connect_db()
     spent, budget = get_budget_and_spent(conn)
     today = date.today()
@@ -236,21 +216,17 @@ if view_category == "進捗":
         budget_amount = budget[category]
         percentage = (spent_amount / budget_amount) * 100 if budget_amount > 0 else 0
 
-        if percentage > 80:
-            st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
-        elif percentage > 50:
-            st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
-        else:
-            st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
+        st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
         st.progress(percentage / 100)
 
 if view_category == "追加":
     conn = connect_db()
     main_categories, sub_categories = get_categories(conn)
 
-    # Streamlit UI
     st.title("データベースにデータを追加")
-    date = st.date_input("日付", datetime.now())
+    today = date.today()
+    date_range = [(today - timedelta(days=i)).strftime("%Y-%m-%d (%a)") for i in range(-31, 100)]
+    selected_date = st.selectbox("日付", date_range, index=date_range.index(today.strftime("%Y-%m-%d (%a)")))
     main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
     main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
     sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
@@ -265,15 +241,16 @@ if view_category == "追加":
         cursor.execute("""
             INSERT INTO transactions (sub_category_id, amount, type, date, detail)
             VALUES (?, ?, ?, ?, ?);
-        """, (sub_category_id, expense, input_type, date.strftime("%Y-%m-%d"), detail))
+        """, (sub_category_id, expense, input_type, datetime.strptime(selected_date, "%Y-%m-%d (%a)").strftime("%Y-%m-%d"), detail))
         conn.commit()
+        conn.close()
+        st.success("データが追加されました")
 
 if view_category == "編集":
     conn = connect_db()
     df = load_data(conn)
 
     st.title("データを編集")
-
 
     edited_df = st.data_editor(
         df,
