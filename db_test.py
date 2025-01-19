@@ -216,8 +216,8 @@ def update_data(df, changes):
         st.error(f"An error occurred: {e}")
 
 # Main script
-sh = get_worksheet_from_gspread_client()
 if not exists_db_file():
+    sh = get_worksheet_from_gspread_client()
     conn = connect_db()
     initialize_data(conn, sh)
 
