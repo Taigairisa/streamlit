@@ -262,7 +262,7 @@ st.title("データを編集")
 
 edited_df = st.data_editor(
     df,
-    disabled=["id"],
+    disabled=["id", "main_category_name", "sub_category_name","type"],
     num_rows="dynamic",
     column_config={
         "amount": st.column_config.NumberColumn(format="¥%f"),
