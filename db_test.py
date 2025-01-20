@@ -187,12 +187,12 @@ def update_data(df, changes):
             """, rows)
 
         if changes["deleted_rows"]:
-            cursor.executemany("DELETE FROM transactions WHERE id = :id", ({"id": int(df.loc[i, "id"])} for i in changes["deleted_rows"]))
+            cursor.executemany("DELETE FROM transactions WHERE id = :id", [{"id": int(df.loc[i, "id"])} for i in changes["deleted_rows"]])
 
         conn.commit()
         conn.close()
     except Exception as e:
-        st.error(f"An error occurred: {e}")
+        st.error(f"An error occurred: {str(e)}")
 
 # Main script
 if not exists_db_file():
@@ -226,8 +226,7 @@ sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_categor
 
 if view_category == "追加":
 
-    date_range = [(today - timedelta(days=i)).strftime("%Y-%m-%d (%a)") for i in range(-31, 100)]
-    selected_date = st.selectbox("日付", date_range, index=date_range.index(today.strftime("%Y-%m-%d (%a)")))
+    selected_date = st.date_input("日付")
     input_type = st.selectbox("種別", ["支出", "収入", "予算"])
     detail = st.text_input("詳細")
     expense = st.number_input("支出額", min_value=0)
@@ -246,15 +245,14 @@ if view_category == "追加":
 if view_category == "編集":
     conn = connect_db()
     df = load_data(conn, sub_category_id)
+    df = df.reset_index(drop=True)
     min_date = datetime.strptime(df['date'].min(), "%Y-%m-%d")
     max_date = datetime.strptime(df['date'].max(), "%Y-%m-%d")
-    start_date, end_date = st.slider(
-        "日付範囲",
-        min_value=min_date,
-        max_value=max_date,
-        value=(min_date, max_date),
-        format="YYYY-MM-DD"
-    )
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("開始日", min_date, min_value=min_date, max_value=max_date)
+    with col2:
+        end_date = st.date_input("終了日", max_date, min_value=min_date, max_value=max_date)
     df = df[(df['date'] >= start_date.strftime("%Y-%m-%d")) & (df['date'] <= end_date.strftime("%Y-%m-%d"))]
 
     edited_df = st.data_editor(
