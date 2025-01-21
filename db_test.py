@@ -237,7 +237,7 @@ if view_category == "追加":
         cursor.execute("""
             INSERT INTO transactions (sub_category_id, amount, type, date, detail)
             VALUES (?, ?, ?, ?, ?);
-        """, (sub_category_id, expense, input_type, datetime.strptime(selected_date, "%Y-%m-%d (%a)").strftime("%Y-%m-%d"), detail))
+        """, (sub_category_id, expense, input_type, selected_date.strftime("%Y-%m-%d"), detail))
         conn.commit()
         conn.close()
         st.success("データが追加されました")
@@ -245,15 +245,22 @@ if view_category == "追加":
 if view_category == "編集":
     conn = connect_db()
     df = load_data(conn, sub_category_id)
-    df = df.reset_index(drop=True)
     min_date = datetime.strptime(df['date'].min(), "%Y-%m-%d")
     max_date = datetime.strptime(df['date'].max(), "%Y-%m-%d")
-    col1, col2 = st.columns(2)
-    with col1:
-        start_date = st.date_input("開始日", min_date, min_value=min_date, max_value=max_date)
-    with col2:
-        end_date = st.date_input("終了日", max_date, min_value=min_date, max_value=max_date)
+    start_date, end_date = st.slider(
+        "期間を選択",
+        min_value=min_date,
+        max_value=max_date,
+        value=(min_date, max_date),
+        format="YYYY-MM-DD"
+    )
+    # col1, col2 = st.columns(2)
+    # with col1:
+    #     start_date = st.date_input("開始日", min_date, min_value=min_date, max_value=max_date)
+    # with col2:
+    #     end_date = st.date_input("終了日", max_date, min_value=min_date, max_value=max_date)
     df = df[(df['date'] >= start_date.strftime("%Y-%m-%d")) & (df['date'] <= end_date.strftime("%Y-%m-%d"))]
+    df = df.reset_index(drop=True)
 
     edited_df = st.data_editor(
         df,
