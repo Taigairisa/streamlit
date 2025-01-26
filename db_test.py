@@ -15,6 +15,8 @@ SHEET_KEY = st.secrets.SP_SHEET_KEY.key
 SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 SERVICE_ACCOUNT = st.secrets["gcp_service_account"]
 DB_FILENAME = Path(__file__).parent / "kakeibo.db"
+sss
+
 
 def get_worksheet_from_gspread_client():
     credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
