@@ -9,13 +9,13 @@ from google.oauth2 import service_account
 import gspread
 import pygwalker as pyg
 import streamlit.components.v1 as components
-import streamlit_authenticator as stauth
+# import streamlit_authenticator as stauth
 
 SHEET_KEY = st.secrets.SP_SHEET_KEY.key
 SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 SERVICE_ACCOUNT = st.secrets["gcp_service_account"]
 DB_FILENAME = Path(__file__).parent / "kakeibo.db"
-sss
+
 
 
 def get_worksheet_from_gspread_client():
