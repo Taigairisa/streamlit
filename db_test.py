@@ -381,7 +381,11 @@ if view_category == "開発者オプション":
             columns = [description[0] for description in cursor.description]
             df = pd.DataFrame(data, columns=columns)
             
-            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
+            try:
+                worksheet = sh.worksheet(table)
+                worksheet.clear()
+            except gspread.exceptions.WorksheetNotFound:
+                worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
             worksheet.update([df.columns.values.tolist()] + df.values.tolist())
         
         conn.close()
