@@ -1,11 +1,14 @@
 from pathlib import Path
 import sqlite3
 from datetime import datetime, date, timedelta
+from dateutil.relativedelta import relativedelta
 import streamlit as st
 import pandas as pd
 from collections import defaultdict
 from google.oauth2 import service_account
 import gspread
+import pygwalker as pyg
+import streamlit.components.v1 as components
 
 SHEET_KEY = st.secrets.SP_SHEET_KEY.key
 SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -201,7 +204,7 @@ if not exists_db_file():
     initialize_data(conn, sh)
 
 with st.sidebar:
-    view_category = st.selectbox(label="ページ変更", options=["追加","編集"])
+    view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","可視化"])
 
     conn = connect_db()
     spent, budget = get_budget_and_spent(conn)
@@ -216,15 +219,64 @@ with st.sidebar:
         st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
         st.progress(percentage / 100)
 
+    # 定期契約の通知
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    # cursor.execute("SELECT id, sub_category_id, amount, date, detail, type FROM transactions WHERE sub_category_id IN (SELECT id FROM sub_categories WHERE main_category_id = (SELECT id FROM main_categories WHERE name = '定期'))")
+    cursor.execute("""
+        SELECT id, sub_category_id, amount, date, detail, type
+        FROM transactions
+        WHERE sub_category_id IN (
+            SELECT id FROM sub_categories WHERE main_category_id = (
+                SELECT id FROM main_categories WHERE name = '定期'
+            )
+        )
+        AND date = (
+            SELECT MAX(date) FROM transactions t2 WHERE t2.detail = transactions.detail
+        )
+    """)
+    recurring_transactions = cursor.fetchall()
+    conn.close()
+    if recurring_transactions:
+        st.write("---")
+        st.title("定期契約の入力")
+
+    for transaction in recurring_transactions:
+        id = transaction[0]
+        sub_category_id = transaction[1]
+        amount = transaction[2]
+        date_str = transaction[3]
+        detail = transaction[4]
+        type = transaction[5]
+
+        transaction_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
+        if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)):
+            st.write(f"{detail}  (前回入力 {date_str})")
+            new_amount = st.number_input(f"{type}額", key=f"add_amount_data_{id} ", value=amount)
+            new_date = st.date_input(f"今回の日付", key=f"add_date_data_{id} ",value=today)
+            if st.button(f"{detail}のデータを追加", key=f"add_data_{id}"):
+                conn = connect_db()
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO transactions (sub_category_id, amount, type, date, detail)
+                    VALUES (?, ?, ?, ?, ?);
+                """, (sub_category_id, new_amount, type, new_date.strftime("%Y-%m-%d"), detail))
+                conn.commit()
+                conn.close()
+                st.success(f"{detail}のデータが追加されました")
+                st.rerun()
+
 today = date.today()
 conn = connect_db()
 main_categories, sub_categories = get_categories(conn)
 main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
 main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
-sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
-sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
 
 if view_category == "追加":
+    sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
+    sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
 
     selected_date = st.date_input("日付")
     input_type = st.selectbox("種別", ["支出", "収入", "予算"])
@@ -243,6 +295,8 @@ if view_category == "追加":
         st.success("データが追加されました")
 
 if view_category == "編集":
+    sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
+    sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
     conn = connect_db()
     df = load_data(conn, sub_category_id)
     min_date = datetime.strptime(df['date'].min(), "%Y-%m-%d")
@@ -281,3 +335,38 @@ if view_category == "編集":
         on_click=update_data,
         args=(df, st.session_state.inventory_table),
     )
+
+# if view_category == "可視化":
+#     conn = connect_db()
+#     df = load_data(conn, sub_category_id)
+#     if df is not None and not df.empty:
+#         # PyGWalkerを使用してHTMLを生成する
+#         pyg_html = pyg.walk(df).to_html()
+
+#         # 生成したHTMLをStreamlitアプリケーションに埋め込む
+#         components.html(pyg_html, height=1000, scrolling=True)
+#     else:
+#         st.warning("表示するデータがありません")
+
+if view_category == "カテゴリー追加・編集":
+    conn = connect_db()
+    sub_category_options = [sub[2] for sub in sub_categories if sub[1] == main_category_id] + ["新規カテゴリ"]
+    selected_sub_category = st.selectbox("小カテゴリを選択", sub_category_options)
+
+    if selected_sub_category == "新規カテゴリ":
+        new_sub_category = st.text_input("新しい小カテゴリ名")
+        if st.button("小カテゴリを追加"):
+            cursor = conn.cursor()
+            cursor.execute("INSERT INTO sub_categories (main_category_id, name) VALUES (?, ?);", (main_category_id, new_sub_category))
+            conn.commit()
+            conn.close()    
+            st.success("小カテゴリが追加されました")
+    else:
+        new_sub_category_name = st.text_input("リネームする小カテゴリ名", value=selected_sub_category)
+        if st.button("小カテゴリをリネーム"):
+            cursor = conn.cursor()
+            cursor.execute("UPDATE sub_categories SET name = ? WHERE main_category_id = ? AND name = ?;", (new_sub_category_name, main_category_id, selected_sub_category))
+            conn.commit()
+            conn.close()    
+            st.success("小カテゴリがリネームされました")
+
