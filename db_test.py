@@ -9,6 +9,7 @@ from google.oauth2 import service_account
 import gspread
 import pygwalker as pyg
 import streamlit.components.v1 as components
+import streamlit_authenticator as stauth
 
 SHEET_KEY = st.secrets.SP_SHEET_KEY.key
 SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -204,7 +205,7 @@ if not exists_db_file():
     initialize_data(conn, sh)
 
 with st.sidebar:
-    view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","可視化"])
+    view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","開発者オプション"])
 
     conn = connect_db()
     spent, budget = get_budget_and_spent(conn)
@@ -336,18 +337,6 @@ if view_category == "編集":
         args=(df, st.session_state.inventory_table),
     )
 
-# if view_category == "可視化":
-#     conn = connect_db()
-#     df = load_data(conn, sub_category_id)
-#     if df is not None and not df.empty:
-#         # PyGWalkerを使用してHTMLを生成する
-#         pyg_html = pyg.walk(df).to_html()
-
-#         # 生成したHTMLをStreamlitアプリケーションに埋め込む
-#         components.html(pyg_html, height=1000, scrolling=True)
-#     else:
-#         st.warning("表示するデータがありません")
-
 if view_category == "カテゴリー追加・編集":
     conn = connect_db()
     sub_category_options = [sub[2] for sub in sub_categories if sub[1] == main_category_id] + ["新規カテゴリ"]
@@ -370,3 +359,41 @@ if view_category == "カテゴリー追加・編集":
             conn.close()    
             st.success("小カテゴリがリネームされました")
 
+if view_category == "開発者オプション":
+    if st.button("DBをダウンロード"):
+        with open(DB_FILENAME, "rb") as file:
+            btn = st.download_button(
+                label="Download DB",
+                data=file,
+                file_name="kakeibo_backup.db",
+                mime="application/octet-stream"
+            )
+    
+    if st.button("Spreadsheetに同期"):
+        sh = get_worksheet_from_gspread_client()
+        conn = connect_db()
+        cursor = conn.cursor()
+
+        tables = ["main_categories", "sub_categories", "transactions"]
+        for table in tables:
+            cursor.execute(f"SELECT * FROM {table}")
+            data = cursor.fetchall()
+            columns = [description[0] for description in cursor.description]
+            df = pd.DataFrame(data, columns=columns)
+            
+            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
+            worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+        
+        conn.close()
+        st.success("Spreadsheetに同期されました")
+    st.title("可視化ツールの実験")
+    conn = connect_db()
+    df = load_data(conn, sub_category_id)
+    if df is not None and not df.empty:
+        # PyGWalkerを使用してHTMLを生成する
+        pyg_html = pyg.walk(df).to_html()
+
+        # 生成したHTMLをStreamlitアプリケーションに埋め込む
+        components.html(pyg_html, height=1000, scrolling=True)
+    else:
+        st.warning("表示するデータがありません")
