@@ -108,6 +108,7 @@ def load_data(conn, sub_category_id):
     query = """
         SELECT
             transactions.id,
+            transactions.sub_category_id,
             transactions.date,
             transactions.detail,
             transactions.type,
@@ -116,6 +117,7 @@ def load_data(conn, sub_category_id):
             transactions
         WHERE sub_category_id = %s;
     """
+  
     query = query % sub_category_id
         
     try:
@@ -162,37 +164,41 @@ def update_data(df, changes):
     try:
         conn = sqlite3.connect(DB_FILENAME)
         cursor = conn.cursor()
-
+        print("changes")
+        print(changes)
         if changes["edited_rows"]:
             deltas = st.session_state.inventory_table["edited_rows"]
-            rows = [defaultdict(lambda: None, dict(df.iloc[i].to_dict(), **delta)) for i, delta in deltas.items()]
-            for row in rows:
-                if row['sub_category_id'] is None:
-                    row['sub_category_id'] = 1
-            cursor.executemany("""
-                UPDATE transactions
-                SET
-                    sub_category_id = :sub_category_id,
-                    amount = :amount,
-                    type = :type,
-                    date = :date,
-                    detail = :detail
-                WHERE id = :id
-            """, rows)
+            rows = [dict(df.iloc[i].to_dict(), **delta) for i, delta in deltas.items()]
+
+            if rows:
+                cursor.executemany("""
+                    UPDATE transactions
+                    SET
+                        amount = :amount,
+                        date = :date,
+                        type = :type,
+                        detail = :detail
+                    WHERE id = :id
+                """, rows)
 
         if changes["added_rows"]:
-            rows = [defaultdict(lambda: None, row) for row in changes["added_rows"]]
-            for row in rows:
-                if row['sub_category_id'] is None:
-                    row['sub_category_id'] = 1
-            cursor.executemany("""
-                INSERT INTO transactions
-                    (sub_category_id, amount, type, date, detail)
-                VALUES
-                    (:sub_category_id, :amount, :type, :date, :detail)
-            """, rows)
+            deltas = st.session_state.inventory_table["added_rows"]
+            for delta in deltas:
+                if not delta :
+                    st.error("空の行が追加されています。空の削除をお願いします。")
+                    deltas.remove(delta)
+            if deltas:
+                rows = [dict(df.iloc[i].to_dict(), **delta) for i, delta in enumerate(deltas)]
+                if rows:
+                    cursor.executemany("""
+                        INSERT INTO transactions
+                            (sub_category_id, amount, type, date, detail)
+                        VALUES
+                            (:sub_category_id, :amount, :type, :date, :detail)
+                    """, rows)
 
         if changes["deleted_rows"]:
+
             cursor.executemany("DELETE FROM transactions WHERE id = :id", [{"id": int(df.loc[i, "id"])} for i in changes["deleted_rows"]])
 
         conn.commit()
@@ -252,7 +258,7 @@ with st.sidebar:
         date_str = transaction[3]
         detail = transaction[4]
         type = transaction[5]
-
+        
         transaction_date = datetime.strptime(date_str, "%Y-%m-%d").date()
 
         if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)):
@@ -320,8 +326,8 @@ if view_category == "編集":
     df = df.reset_index(drop=True)
 
     edited_df = st.data_editor(
-        df,
-        disabled=["id", "main_category_name", "sub_category_name","type"],
+        df.drop(columns=["sub_category_id"]),
+        disabled=["id"],
         num_rows="dynamic",
         column_config={
             "amount": st.column_config.NumberColumn(format="¥%f"),
