@@ -232,7 +232,6 @@ with st.sidebar:
     conn = connect_db()
     cursor = conn.cursor()
 
-    # cursor.execute("SELECT id, sub_category_id, amount, date, detail, type FROM transactions WHERE sub_category_id IN (SELECT id FROM sub_categories WHERE main_category_id = (SELECT id FROM main_categories WHERE name = '定期'))")
     cursor.execute("""
         SELECT id, sub_category_id, amount, date, detail, type
         FROM transactions
@@ -249,33 +248,39 @@ with st.sidebar:
     conn.close()
     if recurring_transactions:
         st.write("---")
-        st.title("定期契約の入力")
+        st.title("未入力の月額")
 
-    for transaction in recurring_transactions:
-        id = transaction[0]
-        sub_category_id = transaction[1]
-        amount = transaction[2]
-        date_str = transaction[3]
-        detail = transaction[4]
-        type = transaction[5]
+        transaction_to_show = []
+        for transaction in recurring_transactions:
+            transaction_date = datetime.strptime(transaction[3], "%Y-%m-%d").date()
+
+            if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)) and transaction[2] > 0:
+                transaction_to_show.append((transaction[0], transaction[1], transaction[2], transaction_date, transaction[4] , transaction[5]))
         
-        transaction_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        if st.toggle(f"{len(transaction_to_show)}件の未入力の月額あり"):
+            for transaction in transaction_to_show:
+                id = transaction[0]
+                sub_category_id = transaction[1]
+                amount = transaction[2]
+                date_str = transaction[3].strftime("%Y/%m/%d")
+                detail = transaction[4] 
+                type = transaction[5]
 
-        if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)):
-            st.write(f"{detail}  (前回入力 {date_str})")
-            new_amount = st.number_input(f"{type}額", key=f"add_amount_data_{id} ", value=amount)
-            new_date = st.date_input(f"今回の日付", key=f"add_date_data_{id} ",value=today)
-            if st.button(f"{detail}のデータを追加", key=f"add_data_{id}"):
-                conn = connect_db()
-                cursor = conn.cursor()
-                cursor.execute("""
-                    INSERT INTO transactions (sub_category_id, amount, type, date, detail)
-                    VALUES (?, ?, ?, ?, ?);
-                """, (sub_category_id, new_amount, type, new_date.strftime("%Y-%m-%d"), detail))
-                conn.commit()
-                conn.close()
-                st.success(f"{detail}のデータが追加されました")
-                st.rerun()
+                st.write("---")
+                st.write(f"● {detail}  (前回入力 {date_str})")
+                new_amount = st.number_input(f"{type}額", key=f"add_amount_data_{id} ", value=amount)
+                new_date = st.date_input(f"今回の日付", key=f"add_date_data_{id} ",value=today)
+                if st.button(f"{detail}のデータを追加", key=f"add_data_{id}"):
+                    conn = connect_db()
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO transactions (sub_category_id, amount, type, date, detail)
+                        VALUES (?, ?, ?, ?, ?);
+                    """, (sub_category_id, new_amount, type, new_date.strftime("%Y-%m-%d"), detail))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"{detail}のデータが追加されました")
+                    st.rerun()
 
 today = date.today()
 conn = connect_db()
@@ -398,6 +403,7 @@ if view_category == "開発者オプション":
         
         conn.close()
         st.success("Spreadsheetに同期されました")
+    st.write("---")
     st.title("可視化ツールの実験")
     conn = connect_db()
     df = load_data(conn, sub_category_id)
