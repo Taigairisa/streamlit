@@ -266,7 +266,6 @@ with st.sidebar:
                 detail = transaction[4] 
                 type = transaction[5]
 
-                st.write("---")
                 st.write(f"● {detail}  (前回入力 {date_str})")
                 new_amount = st.number_input(f"{type}額", key=f"add_amount_data_{id} ", value=amount)
                 new_date = st.date_input(f"今回の日付", key=f"add_date_data_{id} ",value=today)
@@ -281,6 +280,7 @@ with st.sidebar:
                     conn.close()
                     st.success(f"{detail}のデータが追加されました")
                     st.rerun()
+                st.write("---")
 
 today = date.today()
 conn = connect_db()
