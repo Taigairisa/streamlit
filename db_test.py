@@ -438,6 +438,7 @@ if view_category == "開発者オプション":
                     data = worksheet.get_all_values()
                     df = pd.DataFrame(data[1:], columns=data[0])
                     df.to_sql(table, conn, if_exists="replace", index=False)
+                    st.success(f"Worksheet {table} から同期されました")
 
                 except gspread.exceptions.WorksheetNotFound:
                     st.warning(f"Worksheet {table} not found. Created a new one.")
