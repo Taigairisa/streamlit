@@ -434,6 +434,7 @@ if view_category == "開発者オプション":
                 df = pd.DataFrame(data, columns=columns)
                 
                 try:
+                    st.write(f"Worksheet {table} から同期中")
                     worksheet = sh.worksheet(table)
                     data = worksheet.get_all_values()
                     df = pd.DataFrame(data[1:], columns=data[0])
