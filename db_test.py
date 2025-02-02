@@ -297,6 +297,8 @@ def backup_data_to_spreadsheet(conn):
     # backup_time_str = backup_time.fetchall() #ORDER BY time DESC LIMIT 1
     st.write(backup_time[1])
     st.write(datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S"))
+    st.write(datetime.now(pytz.timezone('Asia/Tokyo')))
+    st.write(timedelta(days=1))
 
     st.write(datetime.now(pytz.timezone('Asia/Tokyo')))
     if (not backup_time) or (datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1)):
