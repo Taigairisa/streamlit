@@ -300,7 +300,7 @@ def backup_data_to_spreadsheet(conn):
     st.write(datetime.now(pytz.timezone('Asia/Tokyo')))
     st.write(timedelta(days=1))
 
-    st.write(datetime.now(pytz.timezone('Asia/Tokyo')))
+    st.write(datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S"))
     if (not backup_time) or (datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1)):
         cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
         conn.commit()
