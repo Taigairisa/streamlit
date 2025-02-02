@@ -407,14 +407,14 @@ st.button(
 #             st.success("小カテゴリがリネームされました")
 
 # if view_category == "開発者オプション":
-#     if st.button("DBをダウンロード"):
-#         with open(DB_FILENAME, "rb") as file:
-#             btn = st.download_button(
-#                 label="Download DB",
-#                 data=file,
-#                 file_name="kakeibo_backup.db",
-#                 mime="application/octet-stream"
-#             )
+if st.button("DBをダウンロード"):
+    with open(DB_FILENAME, "rb") as file:
+        btn = st.download_button(
+            label="Download DB",
+            data=file,
+            file_name="kakeibo_backup.db",
+            mime="application/octet-stream"
+            )
     
     # if st.button("Spreadsheetへ手動でバックアップ"):
     #     conn = connect_db()
