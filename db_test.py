@@ -116,8 +116,8 @@ def initialize_db_from_spreadsheet(conn):
         except gspread.exceptions.WorksheetNotFound:
             st.warning(f"Worksheet {table} not found. Created a new one.")
         
-        conn.commit()
-        conn.close()
+    conn.commit()
+    conn.close()
 
 def get_budget_and_spent_of_month(conn, month):
     query = f"""
