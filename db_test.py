@@ -296,6 +296,7 @@ def backup_data_to_spreadsheet(conn):
     backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
     # backup_time_str = backup_time.fetchall() #ORDER BY time DESC LIMIT 1
     st.write(backup_time[1])
+    st.write(datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S"))
 
     if (not backup_time) or (datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1)):
         cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
