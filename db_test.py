@@ -112,12 +112,12 @@ def initialize_db_from_spreadsheet(conn):
 
                 # Insert the data into the newly created table
             df.to_sql(table, conn, if_exists="append", index=False)
-            conn.commit()
             st.success(f"Worksheet {table} から同期されました")
 
         except gspread.exceptions.WorksheetNotFound:
             st.warning(f"Worksheet {table} not found. Created a new one.")
         
+        conn.commit()
         conn.close()
 
 def get_budget_and_spent_of_month(conn, month):
