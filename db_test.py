@@ -56,7 +56,6 @@ def load_data(conn, sub_category_id):
 def initialize_db_from_spreadsheet(conn):
     st.warning("Spreadsheetから同期中")
     sh = get_worksheet_from_gspread_client()
-    conn = connect_db()
     cursor = conn.cursor()
 
     tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
