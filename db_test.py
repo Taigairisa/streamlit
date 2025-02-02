@@ -435,16 +435,16 @@ if view_category == "開発者オプション":
         
         conn.close()
         st.success("Spreadsheetに同期されました")
-    st.write("---")
-    st.title("可視化ツールの実験")
-    conn = connect_db()
-    df = load_data(conn, sub_category_id)
-    if df is not None and not df.empty:
-        # PyGWalkerを使用してHTMLを生成する
-        pyg_html = pyg.walk(df).to_html()
+    # st.write("---")
+    # st.title("可視化ツールの実験")
+    # conn = connect_db()
+    # df = load_data(conn, sub_category_id)
+    # if df is not None and not df.empty:
+    #     # PyGWalkerを使用してHTMLを生成する
+    #     pyg_html = pyg.walk(df).to_html()
 
-        # 生成したHTMLをStreamlitアプリケーションに埋め込む
-        components.html(pyg_html, height=1000, scrolling=True)
-    else:
-        st.warning("表示するデータがありません")
+    #     # 生成したHTMLをStreamlitアプリケーションに埋め込む
+    #     components.html(pyg_html, height=1000, scrolling=True)
+    # else:
+    #     st.warning("表示するデータがありません")
 
