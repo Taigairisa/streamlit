@@ -255,7 +255,6 @@ with st.sidebar:
         transaction_to_show = []
         for transaction in recurring_transactions:
             transaction_date = datetime.strptime(transaction[3], "%Y-%m-%d").date()
-            st.write(transaction)
 
             if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)) and transaction[2] > 0:
                 transaction_to_show.append((transaction[0], transaction[1], transaction[2], transaction_date, transaction[4] , transaction[5]))
@@ -422,76 +421,76 @@ if view_category == "開発者オプション":
         backup_data_to_spreadsheet(conn)
         st.success("Spreadsheetへバックアップされました")
 
-if st.button("Spreadsheetから同期"):
-    
-    st.warning("Spreadsheetから同期中")
-    sh = get_worksheet_from_gspread_client()
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-    for table in tables:
-
-        cursor.execute(f"SELECT * FROM {table}")
-        data = cursor.fetchall()
-        columns = [description[0] for description in cursor.description]
-        df = pd.DataFrame(data, columns=columns)
+    if st.button("Spreadsheetから同期"):
         
-        try:
-            st.write(f"Worksheet {table} から同期中")
-            worksheet = sh.worksheet(table)
-            data = worksheet.get_all_values()
-            df = pd.DataFrame(data[1:], columns=data[0])
-            # Drop the existing table if it exists
-            cursor.execute(f"DROP TABLE IF EXISTS {table}")
+        st.warning("Spreadsheetから同期中")
+        sh = get_worksheet_from_gspread_client()
+        conn = connect_db()
+        cursor = conn.cursor()
 
-            # Create the table with appropriate column types
-            if table == "main_categories":
-                cursor.execute("""
-                    CREATE TABLE main_categories (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL
-                    );
-                """)
-            elif table == "sub_categories":
-                cursor.execute("""
-                    CREATE TABLE sub_categories (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        main_category_id INTEGER NOT NULL,
-                        name TEXT NOT NULL,
-                        FOREIGN KEY (main_category_id) REFERENCES main_categories(id)
-                    );
-                """)
-            elif table == "transactions":
-                cursor.execute("""
-                    CREATE TABLE transactions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        sub_category_id INTEGER NOT NULL,
-                        amount INTEGER NOT NULL,
-                        type TEXT CHECK(type IN ('支出', '収入', '予算')) NOT NULL,
-                        date TEXT NOT NULL,
-                        detail TEXT,
-                        FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id)
-                    );
-                """)
-            elif table == "backup_time":
-                cursor.execute("""
-                    CREATE TABLE backup_time (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        time TEXT NOT NULL
-                    );
-                """)
+        tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+        for table in tables:
 
-            # Insert the data into the newly created table
-            df.to_sql(table, conn, if_exists="append", index=False)
-            conn.commit()
-            st.success(f"Worksheet {table} から同期されました")
+            cursor.execute(f"SELECT * FROM {table}")
+            data = cursor.fetchall()
+            columns = [description[0] for description in cursor.description]
+            df = pd.DataFrame(data, columns=columns)
+            
+            try:
+                st.write(f"Worksheet {table} から同期中")
+                worksheet = sh.worksheet(table)
+                data = worksheet.get_all_values()
+                df = pd.DataFrame(data[1:], columns=data[0])
+                # Drop the existing table if it exists
+                cursor.execute(f"DROP TABLE IF EXISTS {table}")
 
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"Worksheet {table} not found. Created a new one.")
-    
-    conn.close()
-    st.success("Spreadsheetから同期されました")
+                # Create the table with appropriate column types
+                if table == "main_categories":
+                    cursor.execute("""
+                        CREATE TABLE main_categories (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL
+                        );
+                    """)
+                elif table == "sub_categories":
+                    cursor.execute("""
+                        CREATE TABLE sub_categories (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            main_category_id INTEGER NOT NULL,
+                            name TEXT NOT NULL,
+                            FOREIGN KEY (main_category_id) REFERENCES main_categories(id)
+                        );
+                    """)
+                elif table == "transactions":
+                    cursor.execute("""
+                        CREATE TABLE transactions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            sub_category_id INTEGER NOT NULL,
+                            amount INTEGER NOT NULL,
+                            type TEXT CHECK(type IN ('支出', '収入', '予算')) NOT NULL,
+                            date TEXT NOT NULL,
+                            detail TEXT,
+                            FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id)
+                        );
+                    """)
+                elif table == "backup_time":
+                    cursor.execute("""
+                        CREATE TABLE backup_time (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            time TEXT NOT NULL
+                        );
+                    """)
+
+                # Insert the data into the newly created table
+                df.to_sql(table, conn, if_exists="append", index=False)
+                conn.commit()
+                st.success(f"Worksheet {table} から同期されました")
+
+            except gspread.exceptions.WorksheetNotFound:
+                st.warning(f"Worksheet {table} not found. Created a new one.")
+        
+        conn.close()
+        st.success("Spreadsheetから同期されました")
     # st.write("---")
     # st.title("可視化ツールの実験")
     # conn = connect_db()
