@@ -354,18 +354,24 @@ if view_category == "編集":
         )
     else:
         start_date = end_date = min_date
-    # col1, col2 = st.columns(2)
-    # with col1:
-    #     start_date = st.date_input("開始日", min_date, min_value=min_date, max_value=max_date)
-    # with col2:
-    #     end_date = st.date_input("終了日", max_date, min_value=min_date, max_value=max_date)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date = st.date_input("開始日", start_date, min_value=min_date, max_value=max_date)
+    with col2:
+        end_date = st.date_input("終了日", end_date, min_value=min_date, max_value=max_date)
+    
     df = df[(df['date'] >= start_date.strftime("%Y-%m-%d")) & (df['date'] <= end_date.strftime("%Y-%m-%d"))]
     df = df.reset_index(drop=True)
 
+    if st.toggle("データを追加する"):
+        can_edit_num_rows = "dynamic"
+    else:
+        can_edit_num_rows = "fixed"
     edited_df = st.data_editor(
         df.drop(columns=["sub_category_id"]),
         disabled=["id"],
-        num_rows="dynamic",
+        num_rows=can_edit_num_rows,
         column_config={
             "amount": st.column_config.NumberColumn(format="¥%f"),
         },
