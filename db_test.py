@@ -287,8 +287,8 @@ conn = connect_db()
 # today = date.today()
 # conn = connect_db()
 main_categories, sub_categories = get_categories(conn)
-# main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
-# main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
+main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
+main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
 
 # def backup_data_to_spreadsheet(conn):
 #     cursor = conn.cursor()
