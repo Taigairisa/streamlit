@@ -213,6 +213,7 @@ if not exists_db_file():
     conn = connect_db()
     initialize_data(conn, sh)
 
+conn = connect_db()
 # with st.sidebar:
 #     view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","開発者オプション"])
 
