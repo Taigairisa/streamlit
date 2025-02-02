@@ -1,3 +1,5 @@
 .streamlit
 test.py
 secrets.toml
+inventory.db
+kakeibo.db
