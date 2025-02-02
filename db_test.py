@@ -292,7 +292,7 @@ main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_cate
 def backup_data_to_spreadsheet(conn):
     cursor = conn.cursor()
 
-    cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
+    # cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
     backup_time = cursor.execute("SELECT * FROM backup_time ").fetchone() #ORDER BY time DESC LIMIT 1
     st.write(backup_time)
 
