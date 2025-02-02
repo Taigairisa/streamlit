@@ -255,6 +255,7 @@ with st.sidebar:
         transaction_to_show = []
         for transaction in recurring_transactions:
             transaction_date = datetime.strptime(transaction[3], "%Y-%m-%d").date()
+            st.write(transaction)
 
             if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)) and transaction[2] > 0:
                 transaction_to_show.append((transaction[0], transaction[1], transaction[2], transaction_date, transaction[4] , transaction[5]))
