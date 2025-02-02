@@ -61,8 +61,7 @@ def initialize_db_from_spreadsheet(conn):
 
     tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
     for table in tables:
-        cursor.execute(f"SELECT * FROM {table}")
-        data = cursor.fetchall()
+        data = cursor.execute(f"SELECT * FROM {table}").fetchall()
         columns = [description[0] for description in cursor.description]
         df = pd.DataFrame(data, columns=columns)
             
