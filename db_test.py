@@ -295,7 +295,7 @@ def backup_data_to_spreadsheet(conn):
     # cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
     backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
     # backup_time_str = backup_time.fetchall() #ORDER BY time DESC LIMIT 1
-    now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")) 
+    now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
     updated_date = datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S")
     st.write(f"現在時刻: {now_date}")
     st.write(f"バックアップ時刻: {updated_date}")
