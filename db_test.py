@@ -375,8 +375,10 @@ if view_category == "編集":
     has_uncommitted_changes = any(len(v) for v in st.session_state.inventory_table.values())
 
     total_spent = df[df['type'] == '支出']['amount'].sum()
+    total_budget = df[df['type'] == '予算']['amount'].sum()
     st.write(f"合計支出額: {total_spent}円")
-    
+    st.write(f"合計予算額: {total_budget}円")
+
     st.button(
         "Commit changes",
         type="primary",
@@ -410,14 +412,14 @@ if view_category == "カテゴリー追加・編集":
 
 ## 開発者オプションページ
 if view_category == "開発者オプション":
-    if st.button("DBをダウンロード"):
-        with open(DB_FILENAME, "rb") as file:
-            btn = st.download_button(
-                label="Download DB",
-                data=file,
-                file_name="kakeibo_backup.db",
-                mime="application/octet-stream"
-                )
+    # if st.button("DBをダウンロード"):
+    with open(DB_FILENAME, "rb") as file:
+        btn = st.download_button(
+            label="DBファイルのダウンロード",
+            data=file,
+            file_name="kakeibo_backup.db",
+            mime="application/octet-stream"
+            )
     
     if st.button("Spreadsheetへ手動でバックアップ"):
         conn = connect_db()
@@ -425,9 +427,27 @@ if view_category == "開発者オプション":
         st.success("Spreadsheetへバックアップされました")
 
     if st.button("Spreadsheetから同期"):
-        
         conn = connect_db()
         initialize_db_from_spreadsheet(conn)
+    
+    with st.form("SQLクエリ"):
+        query = st.text_area("SQLクエリ", "SELECT * FROM transactions")
+        if st.form_submit_button("実行"):
+            conn = connect_db()
+            cursor = conn.cursor()
+            try:
+                if query.startswith("SELECT"):
+                    df = pd.read_sql(query, conn)
+                    st.write(df)
+                elif query.startswith("INSERT") or query.startswith("UPDATE") or query.startswith("DELETE"):
+                    if st.button("本当に実行しますか？"):
+                        cursor.execute(query)
+                        conn.commit()
+                        st.success("クエリが実行されました")
+                else:
+                    st.warning("SELECT, INSERT, UPDATE, DELETEのいずれかを選択してください")
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
         
 
     # st.write("---")
