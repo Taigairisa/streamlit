@@ -17,8 +17,6 @@ SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://w
 SERVICE_ACCOUNT = st.secrets["gcp_service_account"]
 DB_FILENAME = Path(__file__).parent / "kakeibo.db"
 
-
-
 def get_worksheet_from_gspread_client():
     credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
     gc = gspread.authorize(credentials)
@@ -65,7 +63,6 @@ def initialize_db_from_spreadsheet(conn):
         df = pd.DataFrame(data, columns=columns)
             
         try:
-            st.write(f"Worksheet {table} から同期中")
             worksheet = sh.worksheet(table)
             data = worksheet.get_all_values()
             df = pd.DataFrame(data[1:], columns=data[0])
@@ -224,7 +221,6 @@ if not exists_db_file():
     conn = connect_db()
     initialize_db_from_spreadsheet(conn)
 
-conn = connect_db()
 with st.sidebar:
     view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","開発者オプション"])
 
@@ -299,13 +295,13 @@ with st.sidebar:
                     st.write("---")
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
-today = date.today()
+
 conn = connect_db()
 main_categories, sub_categories = get_categories(conn)
 main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
 main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
 
-
+# 自動バックアップの実行
 backup_time = conn.cursor().execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
 now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
 
@@ -313,6 +309,9 @@ if (not backup_time) or (now_date - datetime.strptime(backup_time[1], "%Y/%m/%d 
     st.warning("バックアップを実行します")
     backup_data_to_spreadsheet(conn)
 
+# 各ページの表示
+
+## データ追加ページ
 if view_category == "追加":
     sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
     sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
@@ -333,6 +332,7 @@ if view_category == "追加":
         conn.close()
         st.success("データが追加されました")
 
+## データ編集ページ
 if view_category == "編集":
     sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
     sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
@@ -374,6 +374,9 @@ if view_category == "編集":
 
     has_uncommitted_changes = any(len(v) for v in st.session_state.inventory_table.values())
 
+    total_spent = df[df['type'] == '支出']['amount'].sum()
+    st.write(f"合計支出額: {total_spent}円")
+    
     st.button(
         "Commit changes",
         type="primary",
@@ -382,6 +385,7 @@ if view_category == "編集":
         args=(df, st.session_state.inventory_table),
     )
 
+## カテゴリー追加・編集ページ
 if view_category == "カテゴリー追加・編集":
     conn = connect_db()
     sub_category_options = [sub[2] for sub in sub_categories if sub[1] == main_category_id] + ["新規カテゴリ"]
@@ -404,7 +408,7 @@ if view_category == "カテゴリー追加・編集":
             conn.close()    
             st.success("小カテゴリがリネームされました")
 
-
+## 開発者オプションページ
 if view_category == "開発者オプション":
     if st.button("DBをダウンロード"):
         with open(DB_FILENAME, "rb") as file:
