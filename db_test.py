@@ -199,6 +199,28 @@ def update_data(df, changes):
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 
+def backup_data_to_spreadsheet(conn):
+    cursor = conn.cursor()
+
+    cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
+    cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
+    conn.commit()
+    sh = get_worksheet_from_gspread_client()
+    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+    for table in tables:
+        cursor.execute(f"SELECT * FROM {table}")
+        data = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        df = pd.DataFrame(data, columns=columns)
+    
+        try:
+            worksheet = sh.worksheet(table)
+            worksheet.clear()
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
+        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+    conn.close()
+
 # Main script
 if not exists_db_file():
     conn = connect_db()
@@ -285,27 +307,6 @@ main_categories, sub_categories = get_categories(conn)
 main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
 main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
 
-def backup_data_to_spreadsheet(conn):
-    cursor = conn.cursor()
-
-    cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
-    cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
-    conn.commit()
-    sh = get_worksheet_from_gspread_client()
-    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-    for table in tables:
-        cursor.execute(f"SELECT * FROM {table}")
-        data = cursor.fetchall()
-        columns = [description[0] for description in cursor.description]
-        df = pd.DataFrame(data, columns=columns)
-    
-        try:
-            worksheet = sh.worksheet(table)
-            worksheet.clear()
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
-        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
-    conn.close()
 
 backup_time = conn.cursor().execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
 now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
@@ -339,6 +340,10 @@ if view_category == "編集":
     sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
     conn = connect_db()
     df = load_data(conn, sub_category_id)
+    if df is None or df.empty:
+        st.warning("表示するデータがありません")
+        st.stop()
+        
     min_date = datetime.strptime(df['date'].min(), "%Y-%m-%d")
     max_date = datetime.strptime(df['date'].max(), "%Y-%m-%d")
     if min_date < max_date:
