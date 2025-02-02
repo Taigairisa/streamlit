@@ -293,14 +293,13 @@ def backup_data_to_spreadsheet(conn):
     cursor = conn.cursor()
 
     # cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
-    backup_time = cursor.execute("SELECT * FROM backup_time ").fetchone()
+    backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
     # backup_time_str = backup_time.fetchall() #ORDER BY time DESC LIMIT 1
     st.write(backup_time)
 
     if (not backup_time) or datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1):
         cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
-        backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
-        st.write(backup_time)
+        conn.commit()
 
         sh = get_worksheet_from_gspread_client()
         tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
