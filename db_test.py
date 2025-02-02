@@ -422,6 +422,7 @@ if view_category == "開発者オプション":
 
     if st.button("Spreadsheetから同期"):
         if st.button("本当に同期しますか？DBのデータが上書きされます"):
+            st.warning("Spreadsheetから同期中")
             sh = get_worksheet_from_gspread_client()
             conn = connect_db()
             cursor = conn.cursor()
