@@ -2,6 +2,7 @@ from pathlib import Path
 import sqlite3
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
+import pytz
 import streamlit as st
 import pandas as pd
 from collections import defaultdict
@@ -128,7 +129,7 @@ def load_data(conn, sub_category_id):
     return df
 
 def get_budget_and_spent(conn):
-    current_month = datetime.now().strftime("%Y-%m")
+    current_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y-%m")
     query = f"""
         SELECT
             sub_categories.name as sub_category_name,
@@ -288,6 +289,34 @@ main_categories, sub_categories = get_categories(conn)
 main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
 main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
 
+def backup_data_to_spreadsheet(conn):
+    cursor = conn.cursor()
+
+    cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
+
+    backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
+
+    if not backup_time or datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1):
+        cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
+        sh = get_worksheet_from_gspread_client()
+        tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+        for table in tables:
+            cursor.execute(f"SELECT * FROM {table}")
+            data = cursor.fetchall()
+            columns = [description[0] for description in cursor.description]
+            df = pd.DataFrame(data, columns=columns)
+        
+            try:
+                worksheet = sh.worksheet(table)
+                worksheet.clear()
+            except gspread.exceptions.WorksheetNotFound:
+                worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
+            worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+
+        conn.close()
+
+backup_data_to_spreadsheet(conn)
+
 if view_category == "追加":
     sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
     sub_category_id = next(sub[0] for sub in sub_categories if sub[2] == sub_category)
@@ -419,28 +448,3 @@ if view_category == "開発者オプション":
     else:
         st.warning("表示するデータがありません")
 
-conn = connect_db()
-cursor = conn.cursor()
-
-cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
-
-backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
-
-if not backup_time or datetime.now() - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1):
-    cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now().strftime("%Y/%m/%d %H:%M:%S")])
-    sh = get_worksheet_from_gspread_client()
-    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-    for table in tables:
-        cursor.execute(f"SELECT * FROM {table}")
-        data = cursor.fetchall()
-        columns = [description[0] for description in cursor.description]
-        df = pd.DataFrame(data, columns=columns)
-        
-        try:
-            worksheet = sh.worksheet(table)
-            worksheet.clear()
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
-        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
-
-    conn.close()
