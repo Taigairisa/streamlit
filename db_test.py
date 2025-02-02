@@ -292,35 +292,31 @@ main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_cate
 def backup_data_to_spreadsheet(conn):
     cursor = conn.cursor()
 
-    # cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
-    backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
-    backup_time = datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S")
+    cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
+    cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
+    conn.commit()
+    sh = get_worksheet_from_gspread_client()
+    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+    for table in tables:
+        cursor.execute(f"SELECT * FROM {table}")
+        data = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        df = pd.DataFrame(data, columns=columns)
     
-    now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
+        try:
+            worksheet = sh.worksheet(table)
+            worksheet.clear()
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
+        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+    conn.close()
 
-    if (not backup_time) or (now_date - backup_time >= timedelta(days=1)):
-        st.write("バックアップを実行します")
-        cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
-        conn.commit()
+backup_time = conn.cursor().execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
+now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
 
-        sh = get_worksheet_from_gspread_client()
-        tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-        for table in tables:
-            cursor.execute(f"SELECT * FROM {table}")
-            data = cursor.fetchall()
-            columns = [description[0] for description in cursor.description]
-            df = pd.DataFrame(data, columns=columns)
-        
-            try:
-                worksheet = sh.worksheet(table)
-                worksheet.clear()
-            except gspread.exceptions.WorksheetNotFound:
-                worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
-            worksheet.update([df.columns.values.tolist()] + df.values.tolist())
-
-        conn.close()
-
-backup_data_to_spreadsheet(conn)
+if (not backup_time) or (now_date - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1)):
+    st.warning("バックアップを実行します")
+    backup_data_to_spreadsheet(conn)
 
 if view_category == "追加":
     sub_category = st.selectbox("サブカテゴリ", [sub[2] for sub in sub_categories if sub[1] == main_category_id])
@@ -419,6 +415,11 @@ if view_category == "開発者オプション":
                 mime="application/octet-stream"
             )
     
+    if st.button("Spreadsheetへ手動でバックアップ"):
+        conn = connect_db()
+        backup_data_to_spreadsheet(conn)
+        st.success("Spreadsheetへバックアップされました")
+
     if st.button("Spreadsheetから同期"):
         if st.button("本当に同期しますか？DBのデータが上書きされます"):
             sh = get_worksheet_from_gspread_client()
