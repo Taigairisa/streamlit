@@ -293,10 +293,9 @@ def backup_data_to_spreadsheet(conn):
     cursor = conn.cursor()
 
     cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
-
     backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
 
-    if not backup_time or datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1):
+    if (not backup_time) or datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1):
         cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
         sh = get_worksheet_from_gspread_client()
         tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
@@ -414,27 +413,30 @@ if view_category == "開発者オプション":
                 mime="application/octet-stream"
             )
     
-    if st.button("Spreadsheetに同期"):
-        sh = get_worksheet_from_gspread_client()
-        conn = connect_db()
-        cursor = conn.cursor()
+    if st.button("Spreadsheetから同期"):
+        if st.button("本当に同期しますか？DBのデータが上書きされます"):
+            sh = get_worksheet_from_gspread_client()
+            conn = connect_db()
+            cursor = conn.cursor()
 
-        tables = ["main_categories", "sub_categories", "transactions"]
-        for table in tables:
-            cursor.execute(f"SELECT * FROM {table}")
-            data = cursor.fetchall()
-            columns = [description[0] for description in cursor.description]
-            df = pd.DataFrame(data, columns=columns)
+            tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+            for table in tables:
+                cursor.execute(f"SELECT * FROM {table}")
+                data = cursor.fetchall()
+                columns = [description[0] for description in cursor.description]
+                df = pd.DataFrame(data, columns=columns)
+                
+                try:
+                    worksheet = sh.worksheet(table)
+                    data = worksheet.get_all_values()
+                    df = pd.DataFrame(data[1:], columns=data[0])
+                    df.to_sql(table, conn, if_exists="replace", index=False)
+
+                except gspread.exceptions.WorksheetNotFound:
+                    st.warning(f"Worksheet {table} not found. Created a new one.")
             
-            try:
-                worksheet = sh.worksheet(table)
-                worksheet.clear()
-            except gspread.exceptions.WorksheetNotFound:
-                worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
-            worksheet.update([df.columns.values.tolist()] + df.values.tolist())
-        
-        conn.close()
-        st.success("Spreadsheetに同期されました")
+            conn.close()
+            st.success("Spreadsheetから同期されました")
     # st.write("---")
     # st.title("可視化ツールの実験")
     # conn = connect_db()
