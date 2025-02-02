@@ -315,13 +315,16 @@ if view_category == "編集":
     df = load_data(conn, sub_category_id)
     min_date = datetime.strptime(df['date'].min(), "%Y-%m-%d")
     max_date = datetime.strptime(df['date'].max(), "%Y-%m-%d")
-    start_date, end_date = st.slider(
-        "期間を選択",
-        min_value=min_date,
-        max_value=max_date,
-        value=(min_date, max_date),
-        format="YYYY-MM-DD"
-    )
+    if min_date < max_date:
+        start_date, end_date = st.slider(
+            "期間を選択",
+            min_value=min_date,
+            max_value=max_date,
+            value=(min_date, max_date),
+            format="YYYY-MM-DD"
+        )
+    else:
+        start_date = end_date = min_date
     # col1, col2 = st.columns(2)
     # with col1:
     #     start_date = st.date_input("開始日", min_date, min_value=min_date, max_value=max_date)
