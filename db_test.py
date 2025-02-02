@@ -30,81 +30,6 @@ def exists_db_file():
 def connect_db():
     return sqlite3.connect(DB_FILENAME)
 
-def initialize_data(conn, sh):
-    cursor = conn.cursor()
-    create_tables(cursor)
-    insert_initial_categories(cursor)
-    insert_initial_sub_categories(cursor)
-    insert_transactions_from_sheets(cursor, sh)
-    conn.commit()
-    conn.close()
-
-def create_tables(cursor):
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS main_categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL
-        );
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS sub_categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            main_category_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            FOREIGN KEY (main_category_id) REFERENCES main_categories(id)
-        );
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            sub_category_id INTEGER NOT NULL,
-            amount INTEGER NOT NULL,
-            type TEXT CHECK(type IN ('支出', '収入', '予算')) NOT NULL,
-            date TEXT NOT NULL,
-            detail TEXT,
-            FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id)
-        );     
-    """)
-
-def insert_initial_categories(cursor):
-    categories = ['日常', '定期', '特別', '旅行']
-    cursor.executemany("INSERT INTO main_categories (name) VALUES (?);", [(cat,) for cat in categories])
-
-def insert_initial_sub_categories(cursor):
-    sub_categories = [
-        (1, '二人で遊ぶお金'), (1, '食費・消耗品'), (1, '幸華お小遣い'), (1, '大河お小遣い'),
-        (2, '大河給与'), (2, '大河投資'), (2, '幸華給与'), (2, '幸華投資'), (2, '家賃'),(2, 'ガス代'), (2, '電気代'), (2, '水道代'), (2, '通信代'), (2, 'サブスクリプション'),
-        (3, '贈与'), (3, '病院'), (3, '引っ越し'), (3, 'イベント'), (3, 'スイッチOTC'), 
-        (4, '202308イタリア'), (4, '202312オーストラリア'),(4, '202312宇治'), (4, '202312大阪'), (4, '202403三重'), (4, '202408アメリカ'), (4, '202407京都'),
-    ]
-    cursor.executemany("INSERT INTO sub_categories (main_category_id, name) VALUES (?, ?);", sub_categories)
-
-def insert_transactions_from_sheets(cursor, sh):
-    input_categories = ["支出", "収入", "予算", "定期契約", "旅行", "特別支出"]
-    for input_category in input_categories:
-        worksheet = sh.worksheet(input_category)
-        data = worksheet.get_all_values()
-        df = pd.DataFrame(data[1:], columns=data[0])
-        input_type = "支出" if input_category in ["支出", "定期契約", "特別支出", "旅行"] else input_category
-        for _, row in df.iterrows():
-            sub_category_no = get_sub_category_no(row)
-            if sub_category_no:
-                cursor.execute("""
-                    INSERT INTO transactions (sub_category_id, amount, type, date, detail)
-                    VALUES (?, ?, ?, ?, ?);
-                """, (sub_category_no, row[input_type], input_type, datetime.strptime(row['日付'], "%Y/%m/%d").strftime("%Y-%m-%d"), row.get('詳細', "")))
-
-def get_sub_category_no(row):
-    category_map = {
-        "食費/消耗品": 2, "二人で遊ぶお金": 1, "幸華お小遣い": 3, "大河お小遣い": 4,
-        "耐久消耗品": 2, "大河給与": 5, "大河投資": 6, "幸華給与": 7, "幸華投資": 8,
-        "贈与": 15, "電気代": 11, "ガス代": 10, "水道代": 12, "通信代": 13, "サブスク": 14,
-        "家賃": 9, "その他": 12, "イタリア": 18, "アメリカ": 23, "オーストラリア": 19,
-        "実家": 20, "三重": 22, "京都": 24, "大阪帰省": 21, "イベント": 26, "引っ越し": 17,
-        "病院": 16
-    }
-    return category_map.get(row["カテゴリ"], None)
-
 def load_data(conn, sub_category_id):
     query = """
         SELECT
@@ -128,8 +53,75 @@ def load_data(conn, sub_category_id):
         return None
     return df
 
-def get_budget_and_spent(conn):
-    current_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y-%m")
+def initialize_db_from_spreadsheet(conn):
+    st.warning("Spreadsheetから同期中")
+    sh = get_worksheet_from_gspread_client()
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+    for table in tables:
+        cursor.execute(f"SELECT * FROM {table}")
+        data = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        df = pd.DataFrame(data, columns=columns)
+            
+        try:
+            st.write(f"Worksheet {table} から同期中")
+            worksheet = sh.worksheet(table)
+            data = worksheet.get_all_values()
+            df = pd.DataFrame(data[1:], columns=data[0])
+                # Drop the existing table if it exists
+            cursor.execute(f"DROP TABLE IF EXISTS {table}")
+
+                # Create the table with appropriate column types
+            if table == "main_categories":
+                cursor.execute("""
+                        CREATE TABLE main_categories (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name TEXT NOT NULL
+                        );
+                    """)
+            elif table == "sub_categories":
+                cursor.execute("""
+                        CREATE TABLE sub_categories (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            main_category_id INTEGER NOT NULL,
+                            name TEXT NOT NULL,
+                            FOREIGN KEY (main_category_id) REFERENCES main_categories(id)
+                        );
+                    """)
+            elif table == "transactions":
+                cursor.execute("""
+                        CREATE TABLE transactions (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            sub_category_id INTEGER NOT NULL,
+                            amount INTEGER NOT NULL,
+                            type TEXT CHECK(type IN ('支出', '収入', '予算')) NOT NULL,
+                            date TEXT NOT NULL,
+                            detail TEXT,
+                            FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id)
+                        );
+                    """)
+            elif table == "backup_time":
+                cursor.execute("""
+                        CREATE TABLE backup_time (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            time TEXT NOT NULL
+                        );
+                    """)
+
+                # Insert the data into the newly created table
+            df.to_sql(table, conn, if_exists="append", index=False)
+            conn.commit()
+            st.success(f"Worksheet {table} から同期されました")
+
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"Worksheet {table} not found. Created a new one.")
+        
+        conn.close()
+
+def get_budget_and_spent_of_month(conn, month):
     query = f"""
         SELECT
             sub_categories.name as sub_category_name,
@@ -143,7 +135,7 @@ def get_budget_and_spent(conn):
             main_categories ON sub_categories.main_category_id = main_categories.id
         WHERE
             main_categories.name = '日常' AND
-            transactions.date LIKE '{current_month}%'
+            transactions.date LIKE '{month}%'
         GROUP BY
             sub_category_name, type;
     """
@@ -209,16 +201,18 @@ def update_data(df, changes):
 
 # Main script
 if not exists_db_file():
-    sh = get_worksheet_from_gspread_client()
     conn = connect_db()
-    initialize_data(conn, sh)
+    initialize_db_from_spreadsheet(conn)
 
 conn = connect_db()
 with st.sidebar:
     view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","開発者オプション"])
 
     conn = connect_db()
-    spent, budget = get_budget_and_spent(conn)
+    current_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y-%m")
+    months = [(datetime.now(pytz.timezone('Asia/Tokyo')) - relativedelta(months=i)).strftime("%Y-%m") for i in range(12)]
+    selected_month = st.selectbox("予実管理する月を選択", months, index=0)
+    spent, budget = get_budget_and_spent_of_month(conn, selected_month)
     today = date.today()
     st.title("今月の予算進捗")
     st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
@@ -251,39 +245,40 @@ with st.sidebar:
     if recurring_transactions:
         st.write("---")
         st.title("未入力の月額")
+        try:
+            transaction_to_show = []
+            for transaction in recurring_transactions:
+                transaction_date = datetime.strptime(transaction[3], "%Y-%m-%d").date()
 
-        transaction_to_show = []
-        for transaction in recurring_transactions:
-            transaction_date = datetime.strptime(transaction[3], "%Y-%m-%d").date()
+                if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)) and transaction[2] > 0:
+                    transaction_to_show.append((transaction[0], transaction[1], transaction[2], transaction_date, transaction[4] , transaction[5]))
+            
+            if st.toggle(f"{len(transaction_to_show)}件の未入力の月額あり"):
+                for transaction in transaction_to_show:
+                    id = transaction[0]
+                    sub_category_id = transaction[1]
+                    amount = transaction[2]
+                    date_str = transaction[3].strftime("%Y/%m/%d")
+                    detail = transaction[4] 
+                    type = transaction[5]
 
-            if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)) and transaction[2] > 0:
-                transaction_to_show.append((transaction[0], transaction[1], transaction[2], transaction_date, transaction[4] , transaction[5]))
-        
-        if st.toggle(f"{len(transaction_to_show)}件の未入力の月額あり"):
-            for transaction in transaction_to_show:
-                id = transaction[0]
-                sub_category_id = transaction[1]
-                amount = transaction[2]
-                date_str = transaction[3].strftime("%Y/%m/%d")
-                detail = transaction[4] 
-                type = transaction[5]
-
-                st.write(f"● {detail}  (前回入力 {date_str})")
-                new_amount = st.number_input(f"{type}額", key=f"add_amount_data_{id} ", value=amount)
-                new_date = st.date_input(f"今回の日付", key=f"add_date_data_{id} ",value=today)
-                if st.button(f"{detail}のデータを追加", key=f"add_data_{id}"):
-                    conn = connect_db()
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        INSERT INTO transactions (sub_category_id, amount, type, date, detail)
-                        VALUES (?, ?, ?, ?, ?);
-                    """, (sub_category_id, new_amount, type, new_date.strftime("%Y-%m-%d"), detail))
-                    conn.commit()
-                    conn.close()
-                    st.success(f"{detail}のデータが追加されました")
-                    st.rerun()
-                st.write("---")
-
+                    st.write(f"● {detail}  (前回入力 {date_str})")
+                    new_amount = st.number_input(f"{type}額", key=f"add_amount_data_{id} ", value=amount)
+                    new_date = st.date_input(f"今回の日付", key=f"add_date_data_{id} ",value=today)
+                    if st.button(f"{detail}のデータを追加", key=f"add_data_{id}"):
+                        conn = connect_db()
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            INSERT INTO transactions (sub_category_id, amount, type, date, detail)
+                            VALUES (?, ?, ?, ?, ?);
+                        """, (sub_category_id, new_amount, type, new_date.strftime("%Y-%m-%d"), detail))
+                        conn.commit()
+                        conn.close()
+                        st.success(f"{detail}のデータが追加されました")
+                        st.rerun()
+                    st.write("---")
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
 today = date.today()
 conn = connect_db()
 main_categories, sub_categories = get_categories(conn)
@@ -406,6 +401,7 @@ if view_category == "カテゴリー追加・編集":
             conn.close()    
             st.success("小カテゴリがリネームされました")
 
+
 if view_category == "開発者オプション":
     if st.button("DBをダウンロード"):
         with open(DB_FILENAME, "rb") as file:
@@ -423,74 +419,10 @@ if view_category == "開発者オプション":
 
     if st.button("Spreadsheetから同期"):
         
-        st.warning("Spreadsheetから同期中")
-        sh = get_worksheet_from_gspread_client()
         conn = connect_db()
-        cursor = conn.cursor()
-
-        tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-        for table in tables:
-
-            cursor.execute(f"SELECT * FROM {table}")
-            data = cursor.fetchall()
-            columns = [description[0] for description in cursor.description]
-            df = pd.DataFrame(data, columns=columns)
-            
-            try:
-                st.write(f"Worksheet {table} から同期中")
-                worksheet = sh.worksheet(table)
-                data = worksheet.get_all_values()
-                df = pd.DataFrame(data[1:], columns=data[0])
-                # Drop the existing table if it exists
-                cursor.execute(f"DROP TABLE IF EXISTS {table}")
-
-                # Create the table with appropriate column types
-                if table == "main_categories":
-                    cursor.execute("""
-                        CREATE TABLE main_categories (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT NOT NULL
-                        );
-                    """)
-                elif table == "sub_categories":
-                    cursor.execute("""
-                        CREATE TABLE sub_categories (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            main_category_id INTEGER NOT NULL,
-                            name TEXT NOT NULL,
-                            FOREIGN KEY (main_category_id) REFERENCES main_categories(id)
-                        );
-                    """)
-                elif table == "transactions":
-                    cursor.execute("""
-                        CREATE TABLE transactions (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            sub_category_id INTEGER NOT NULL,
-                            amount INTEGER NOT NULL,
-                            type TEXT CHECK(type IN ('支出', '収入', '予算')) NOT NULL,
-                            date TEXT NOT NULL,
-                            detail TEXT,
-                            FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id)
-                        );
-                    """)
-                elif table == "backup_time":
-                    cursor.execute("""
-                        CREATE TABLE backup_time (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            time TEXT NOT NULL
-                        );
-                    """)
-
-                # Insert the data into the newly created table
-                df.to_sql(table, conn, if_exists="append", index=False)
-                conn.commit()
-                st.success(f"Worksheet {table} から同期されました")
-
-            except gspread.exceptions.WorksheetNotFound:
-                st.warning(f"Worksheet {table} not found. Created a new one.")
+        initialize_db_from_spreadsheet(conn)
         
-        conn.close()
-        st.success("Spreadsheetから同期されました")
+
     # st.write("---")
     # st.title("可視化ツールの実験")
     # conn = connect_db()
