@@ -295,14 +295,12 @@ def backup_data_to_spreadsheet(conn):
     # cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
     backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
     # backup_time_str = backup_time.fetchall() #ORDER BY time DESC LIMIT 1
-    st.write(backup_time[1])
     now_date = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")
-    st.write(datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S"))
-    st.write(datetime.now(pytz.timezone('Asia/Tokyo')))
-    st.write(timedelta(days=1))
+    updated_date = datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S")
+    st.write(now_date)
+    st.write(updated_date)
 
-
-    st.write(now_date - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S"))
+    st.write(now_date - updated_date)
     if (not backup_time) or (datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1)):
         cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
         conn.commit()
