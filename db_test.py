@@ -418,3 +418,29 @@ if view_category == "開発者オプション":
         components.html(pyg_html, height=1000, scrolling=True)
     else:
         st.warning("表示するデータがありません")
+
+conn = connect_db()
+cursor = conn.cursor()
+
+cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
+
+backup_time = cursor.execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
+
+if not backup_time or datetime.now() - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1):
+    cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now().strftime("%Y/%m/%d %H:%M:%S")])
+    sh = get_worksheet_from_gspread_client()
+    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+    for table in tables:
+        cursor.execute(f"SELECT * FROM {table}")
+        data = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        df = pd.DataFrame(data, columns=columns)
+        
+        try:
+            worksheet = sh.worksheet(table)
+            worksheet.clear()
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
+        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+
+    conn.close()
