@@ -298,7 +298,7 @@ def backup_data_to_spreadsheet(conn):
     st.write(backup_time)
 
     if (not backup_time) or datetime.now(pytz.timezone('Asia/Tokyo')) - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(days=1):
-        cursor.execute("INSERT INTO backup_time (time) VALUES (?)", (datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")))
+        cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
         sh = get_worksheet_from_gspread_client()
         tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
         for table in tables:
