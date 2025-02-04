@@ -57,11 +57,7 @@ def initialize_db_from_spreadsheet(conn):
     cursor = conn.cursor()
 
     tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-    for table in tables:
-        data = cursor.execute(f"SELECT * FROM {table}").fetchall()
-        columns = [description[0] for description in cursor.description]
-        df = pd.DataFrame(data, columns=columns)
-            
+    for table in tables:         
         try:
             worksheet = sh.worksheet(table)
             data = worksheet.get_all_values()
