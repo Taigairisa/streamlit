@@ -232,9 +232,10 @@ with st.sidebar:
         spent_amount = spent.get(category, 0)
         budget_amount = budget[category]
         percentage = (spent_amount / budget_amount) * 100 if budget_amount > 0 else 0
+        percentage = percentage if percentage <= 100 else 100
 
         st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
-        st.progress(percentage if percentage <= 100 else 100 / 100)
+        st.progress(percentage / 100)
 
     # 定期契約の通知
     conn = connect_db()
