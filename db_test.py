@@ -186,7 +186,6 @@ def update_data(df, changes):
             cursor.executemany("DELETE FROM transactions WHERE id = :id", [{"id": int(df.loc[i, "id"])} for i in changes["deleted_rows"]])
 
         conn.commit()
-        conn.close()
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 
