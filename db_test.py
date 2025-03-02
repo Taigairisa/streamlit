@@ -218,7 +218,7 @@ def analyze_expenses(df):
     if filtered_df.empty:
         return "今月のデータはありません。"
     category_summary = filtered_df.to_string(index=False)
-    prompt = f"今月の{selected_month}の支出の内訳は次のとおりです:\n{category_summary}\nこのデータについて分析をして大河と幸華の思い出を推定して。家計について、できるだけほめるように、かつ親しみ深い口調で、10行以内で答えてください。"
+    prompt = f"今月の{selected_month}の支出の内訳は次のとおりです:\n{category_summary}\nこのデータについて各カテゴリごとに分析をして大河と幸華の思い出を推定して。家計について、できるだけほめるように、かつ親しみ深い口調で、10行以内で答えてください。"
     
     try:
         response = model.generate_content(prompt)
@@ -232,6 +232,10 @@ if not exists_db_file():
     initialize_db_from_spreadsheet(conn)
 
 with st.sidebar:
+    if st.secrets.get("IS_PRODUCTION", False):
+        st.write("## 本番環境")
+    else:
+        st.write("## 開発環境")
     view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","開発者オプション"])
 
     conn = connect_db()
@@ -321,13 +325,13 @@ backup_time = conn.cursor().execute("SELECT * FROM backup_time ORDER BY time DES
 now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
 
 if st.secrets.get("IS_PRODUCTION", False):
-    st.warning("本番環境でのバックアップは30分ごとに実行されます")
     if (not backup_time) or (now_date - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(minutes=30)):
         st.warning("バックアップを実行します")
         backup_data_to_spreadsheet(conn)
         st.success("バックアップが完了しました")
 else:
-    st.warning("開発環境でのバックアップはないです")
+    st.warning("開発環境のため、自動バックアップは実行されません")
+        
 
 conn = connect_db()
 main_categories, sub_categories = get_categories(conn)
