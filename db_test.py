@@ -5,17 +5,19 @@ from dateutil.relativedelta import relativedelta
 import pytz
 import streamlit as st
 import pandas as pd
-from collections import defaultdict
 from google.oauth2 import service_account
 import gspread
-import pygwalker as pyg
-import streamlit.components.v1 as components
+import google.generativeai as genai
 # import streamlit_authenticator as stauth
 
 SHEET_KEY = st.secrets.SP_SHEET_KEY.key
 SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 SERVICE_ACCOUNT = st.secrets["gcp_service_account"]
+GEMINI_API_KEY = st.secrets.GEMINI_API.api_key
 DB_FILENAME = Path(__file__).parent / "kakeibo.db"
+
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-pro-002")
 
 def get_worksheet_from_gspread_client():
     credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
@@ -211,6 +213,19 @@ def backup_data_to_spreadsheet(conn):
         worksheet.update([df.columns.values.tolist()] + df.values.tolist())
     conn.close()
 
+def analyze_expenses(df):
+    filtered_df = df[df['date'].str.startswith(selected_month)]
+    if filtered_df.empty:
+        return "今月のデータはありません。"
+    category_summary = filtered_df.to_string(index=False)
+    prompt = f"今月の{selected_month}の支出の内訳は次のとおりです:\n{category_summary}\nこのデータについて分析をして大河と幸華の思い出を推定して。家計について、できるだけほめるように、かつ親しみ深い口調で、10行以内で答えてください。"
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"エラーが発生しました: {e}"
+
 # Main script
 if not exists_db_file():
     conn = connect_db()
@@ -220,9 +235,9 @@ with st.sidebar:
     view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","開発者オプション"])
 
     conn = connect_db()
-    current_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y-%m")
+    # current_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y-%m")
     months = [(datetime.now(pytz.timezone('Asia/Tokyo')) - relativedelta(months=i)).strftime("%Y-%m") for i in range(12)]
-    selected_month = st.selectbox("予実管理する月を選択", months, index=0)
+    selected_month = st.selectbox("予実管理する月を選択", months, index=0, key="select_month")
     spent, budget = get_budget_and_spent_of_month(conn, selected_month)
     today = date.today()
     st.title("今月の予算進捗")
@@ -235,6 +250,14 @@ with st.sidebar:
 
         st.write(f"{category}: {spent_amount}円 / {budget_amount}円")
         st.progress(percentage / 100)
+
+
+    if st.button("今月の支出を分析"):
+        conn = connect_db()
+        df = load_data(conn, 1)
+        with st.spinner("分析中..."):
+            analysis = analyze_expenses(df)
+            st.write(analysis)
 
     # 定期契約の通知
     conn = connect_db()
@@ -297,15 +320,20 @@ conn = connect_db()
 backup_time = conn.cursor().execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
 now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
 
-if (not backup_time) or (now_date - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(minutes=30)):
-    st.warning("バックアップを実行します")
-    backup_data_to_spreadsheet(conn)
-    st.success("バックアップが完了しました")
+if st.secrets.get("IS_PRODUCTION", False):
+    st.warning("本番環境でのバックアップは30分ごとに実行されます")
+    if (not backup_time) or (now_date - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(minutes=30)):
+        st.warning("バックアップを実行します")
+        backup_data_to_spreadsheet(conn)
+        st.success("バックアップが完了しました")
+else:
+    st.warning("開発環境でのバックアップはないです")
 
 conn = connect_db()
 main_categories, sub_categories = get_categories(conn)
 main_category = st.selectbox("カテゴリ", [cat[1] for cat in main_categories])
 main_category_id = next(cat[0] for cat in main_categories if cat[1] == main_category)
+
 
 
 # 各ページの表示
@@ -467,4 +495,3 @@ if view_category == "開発者オプション":
     #     components.html(pyg_html, height=1000, scrolling=True)
     # else:
     #     st.warning("表示するデータがありません")
-
