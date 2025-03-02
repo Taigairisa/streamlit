@@ -136,7 +136,7 @@ def get_budget_and_spent_of_month(conn, month):
     budget = df[df['type'] == '予算'].groupby('sub_category_name')['total'].sum()
     spent = df[df['type'] == '支出'].groupby('sub_category_name')['total'].sum()
     conn.close()
-    return spent, budget
+    return spent, budget, df
 
 def get_categories(conn):
     cursor = conn.cursor()
@@ -213,13 +213,33 @@ def backup_data_to_spreadsheet(conn):
         worksheet.update([df.columns.values.tolist()] + df.values.tolist())
     conn.close()
 
-def analyze_expenses(df):
-    filtered_df = df[df['date'].str.startswith(selected_month)]
-    if filtered_df.empty:
+def analyze_expenses(conn, month):
+
+    query = f"""
+            SELECT
+                sub_categories.name as sub_category_name,
+                detail,
+                type
+                date,
+                amount
+            FROM
+                transactions
+            JOIN
+                sub_categories ON transactions.sub_category_id = sub_categories.id
+            JOIN
+                main_categories ON sub_categories.main_category_id = main_categories.id
+            WHERE
+                main_categories.name = '日常' AND
+                transactions.date LIKE '{month}%'
+        """
+    df = pd.read_sql(query, conn)
+
+    if df.empty:
         return "今月のデータはありません。"
-    category_summary = filtered_df.to_string(index=False)
-    prompt = f"今月の{selected_month}の支出の内訳は次のとおりです:\n{category_summary}\nこのデータについて各カテゴリごとに分析をして大河と幸華の思い出を推定して。家計について、できるだけほめるように、かつ親しみ深い口調で、10行以内で答えてください。"
+    category_summary = df.to_string(index=False)
+    prompt = f"今月の{selected_month}の支出の内訳は次のとおりです:\n{category_summary}\nこのデータについて各カテゴリごとに分析をして大河と幸華の共同の思い出を推定して。家計について、できるだけほめるように、かつ親しみ深い口調で、10行以内で答えてください。"
     
+
     try:
         response = model.generate_content(prompt)
         return response.text
@@ -242,7 +262,7 @@ with st.sidebar:
     # current_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y-%m")
     months = [(datetime.now(pytz.timezone('Asia/Tokyo')) - relativedelta(months=i)).strftime("%Y-%m") for i in range(12)]
     selected_month = st.selectbox("予実管理する月を選択", months, index=0, key="select_month")
-    spent, budget = get_budget_and_spent_of_month(conn, selected_month)
+    spent, budget, df = get_budget_and_spent_of_month(conn, selected_month)
     today = date.today()
     st.title("今月の予算進捗")
     st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
@@ -257,10 +277,10 @@ with st.sidebar:
 
 
     if st.button("今月の支出を分析"):
-        conn = connect_db()
-        df = load_data(conn, 1)
+        
         with st.spinner("分析中..."):
-            analysis = analyze_expenses(df)
+            conn = connect_db()
+            analysis = analyze_expenses(conn, selected_month)
             st.write(analysis)
 
     # 定期契約の通知
