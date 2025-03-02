@@ -265,7 +265,7 @@ with st.sidebar:
     spent, budget, df = get_budget_and_spent_of_month(conn, selected_month)
     today = date.today()
     st.title("今月の予算進捗")
-    st.markdown(f" **【{today.month}月分】** {today.month}月{today.day}日時点の使用状況：")
+    st.markdown(f" **【{selected_month}月分】** {today.month}月{today.day}日時点の使用状況：")
     for category in budget.index:
         spent_amount = spent.get(category, 0)
         budget_amount = budget[category]
