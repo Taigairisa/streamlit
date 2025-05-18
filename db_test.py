@@ -255,6 +255,7 @@ def get_monthly_summary():
         type,
         SUM(amount) as total
     FROM transactions
+    WHERE date >= '2023-10-01'  -- 2023年10月以降のデータのみを対象
     GROUP BY month, type
     ORDER BY month;
     """
@@ -264,8 +265,9 @@ def get_monthly_summary():
     # ピボットテーブルを作成
     pivot_df = df.pivot(index='month', columns='type', values='total').fillna(0)
     
-    # 資産（累計）を計算
-    pivot_df['資産'] = (pivot_df['収入'] - pivot_df['支出']).cumsum()
+    # 当月収支と累計資産を別々に計算
+    pivot_df['当月収支'] = pivot_df['収入'] - pivot_df['支出']
+    pivot_df['累計資産'] = pivot_df['当月収支'].cumsum()
     
     return pivot_df
 
@@ -500,8 +502,8 @@ if view_category == "グラフ":
     # データ取得
     monthly_data = get_monthly_summary()
     
-    # グラフ作成
-    fig = {
+    # 収支グラフ
+    fig_flow = {
         'data': [
             {
                 'x': monthly_data.index,
@@ -519,20 +521,40 @@ if view_category == "グラフ":
             },
             {
                 'x': monthly_data.index,
-                'y': monthly_data['資産'],
+                'y': monthly_data['当月収支'],
                 'type': 'scatter',
-                'name': '資産',
-                'line': {'color': 'blue'}
+                'name': '当月収支',
+                'line': {'color': 'yellow'}
             }
         ],
         'layout': {
-            'title': '月次収支推移',
+            'title': '月次収支（2023年10月以降）',
             'xaxis': {'title': '月'},
             'yaxis': {'title': '金額（円）'}
         }
     }
     
-    st.plotly_chart(fig)
+    # 資産グラフ
+    fig_assets = {
+        'data': [
+            {
+                'x': monthly_data.index,
+                'y': monthly_data['累計資産'],
+                'type': 'scatter',
+                'name': '累計資産',
+                'line': {'color': 'blue'}
+            }
+        ],
+        'layout': {
+            'title': '累計資産推移（2023年10月以降）',
+            'xaxis': {'title': '月'},
+            'yaxis': {'title': '金額（円）'}
+        }
+    }
+    
+    # 2つのグラフを表示
+    st.plotly_chart(fig_flow)
+    st.plotly_chart(fig_assets)
     
     # データテーブルも表示
     st.write("### 月次データ")
