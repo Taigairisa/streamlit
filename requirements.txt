@@ -24,3 +24,4 @@ urllib3==2.2.2
 google-auth==2.23.2
 gspread==5.11.3
 pygwalker == 0.4.9.13
+plotly == 6.1.0

@@ -246,6 +246,29 @@ def analyze_expenses(conn, month):
     except Exception as e:
         return f"エラーが発生しました: {e}"
 
+def get_monthly_summary():
+    """月次の収支サマリーを取得する"""
+    conn = connect_db()
+    query = """
+    SELECT 
+        strftime('%Y-%m', date) as month,
+        type,
+        SUM(amount) as total
+    FROM transactions
+    GROUP BY month, type
+    ORDER BY month;
+    """
+    df = pd.read_sql(query, conn)
+    conn.close()
+    
+    # ピボットテーブルを作成
+    pivot_df = df.pivot(index='month', columns='type', values='total').fillna(0)
+    
+    # 資産（累計）を計算
+    pivot_df['資産'] = (pivot_df['収入'] - pivot_df['支出']).cumsum()
+    
+    return pivot_df
+
 # Main script
 if not exists_db_file():
     conn = connect_db()
@@ -256,7 +279,10 @@ with st.sidebar:
         st.write("## 本番環境")
     else:
         st.write("## 開発環境")
-    view_category = st.selectbox(label="ページ変更", options=["追加","編集","カテゴリー追加・編集","開発者オプション"])
+    view_category = st.selectbox(
+    label="ページ変更",
+    options=["追加", "編集", "カテゴリー追加・編集", "グラフ", "開発者オプション"]
+)
 
     conn = connect_db()
     # current_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y-%m")
@@ -467,6 +493,51 @@ if view_category == "カテゴリー追加・編集":
             conn.close()    
             st.success("小カテゴリがリネームされました")
 
+## グラフページ
+if view_category == "グラフ":
+    st.title("収支推移グラフ")
+    
+    # データ取得
+    monthly_data = get_monthly_summary()
+    
+    # グラフ作成
+    fig = {
+        'data': [
+            {
+                'x': monthly_data.index,
+                'y': monthly_data['収入'],
+                'type': 'scatter',
+                'name': '収入',
+                'line': {'color': 'green'}
+            },
+            {
+                'x': monthly_data.index,
+                'y': monthly_data['支出'],
+                'type': 'scatter',
+                'name': '支出',
+                'line': {'color': 'red'}
+            },
+            {
+                'x': monthly_data.index,
+                'y': monthly_data['資産'],
+                'type': 'scatter',
+                'name': '資産',
+                'line': {'color': 'blue'}
+            }
+        ],
+        'layout': {
+            'title': '月次収支推移',
+            'xaxis': {'title': '月'},
+            'yaxis': {'title': '金額（円）'}
+        }
+    }
+    
+    st.plotly_chart(fig)
+    
+    # データテーブルも表示
+    st.write("### 月次データ")
+    st.dataframe(monthly_data.style.format('{:,.0f}'))
+
 ## 開発者オプションページ
 if view_category == "開発者オプション":
     # if st.button("DBをダウンロード"):
@@ -519,3 +590,50 @@ if view_category == "開発者オプション":
     #     components.html(pyg_html, height=1000, scrolling=True)
     # else:
     #     st.warning("表示するデータがありません")
+
+# from datetime import datetime
+
+# # データベース接続を取得
+# conn = connect_db()
+# cursor = conn.cursor()
+
+# # 定期契約のトランザクションを取得
+# cursor.execute("""
+#     SELECT id, sub_category_id, amount, date, detail, type
+#     FROM transactions
+#     WHERE sub_category_id IN (
+#         SELECT id FROM sub_categories WHERE main_category_id = (
+#             SELECT id FROM main_categories WHERE name = '定期'
+#         )
+#     )
+#     AND date = (
+#         SELECT MAX(date) FROM transactions t2 WHERE t2.detail = transactions.detail
+#     )
+# """)
+# recurring_transactions = cursor.fetchall()
+# conn.close()
+
+# if recurring_transactions:
+#     st.write("---")
+#     st.title("定期契約の入力")
+
+#     for transaction in recurring_transactions:
+#         id = transaction[0]
+#         sub_category_id = transaction[1]
+#         amount = transaction[2]
+#         date_str = transaction[3]
+#         detail = transaction[4]
+#         type = transaction[5]
+
+#         # 日付文字列の内容を確認
+#         st.write(f"Original date string: {date_str}")
+
+#         try:
+#             transaction_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+#         except ValueError as e:
+#             st.error(f"Date conversion error: {str(e)}")
+#             continue
+
+#         today = datetime.today().date()
+#         if today >= (transaction_date + relativedelta(months=1)) and today < (transaction_date + relativedelta(months=2)):
+#             st.write(f"{detail}  (前回入力 {date_str})")

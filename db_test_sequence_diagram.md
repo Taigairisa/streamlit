@@ -1,22 +1,22 @@
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Streamlit App
-    participant SQLite DB
-    participant Google Sheets
+    participant ユーザー
+    participant Streamlit アプリ
+    participant SQLite データベース
+    participant Google シート
 
-    User->>Streamlit App: Interacts with UI (e.g., adds data, edits data)
-    Streamlit App->>SQLite DB: Connects to SQLite DB
-    alt User adds data
-        Streamlit App->>SQLite DB: Executes INSERT query
-    else User edits data
-        Streamlit App->>SQLite DB: Executes UPDATE query
-    else User deletes data
-        Streamlit App->>SQLite DB: Executes DELETE query
+    ユーザー->>Streamlit アプリ: UIと対話 (例: データ追加、データ編集)
+    Streamlit アプリ->>SQLite データベース: SQLite データベースに接続
+    alt ユーザーがデータを追加
+        Streamlit アプリ->>SQLite データベース: INSERT クエリを実行
+    else ユーザーがデータを編集
+        Streamlit アプリ->>SQLite データベース: UPDATE クエリを実行
+    else ユーザーがデータを削除
+        Streamlit アプリ->>SQLite データベース: DELETE クエリを実行
     end
-    SQLite DB-->>Streamlit App: Returns success/failure
-    Streamlit App->>Google Sheets: Connects to Google Sheets
-    Streamlit App->>Google Sheets: Backs up data (if needed)
-    Google Sheets-->>Streamlit App: Returns success/failure
-    Streamlit App-->>User: Updates UI with results
+    SQLite データベース-->>Streamlit アプリ: 成功/失敗を返す
+    Streamlit アプリ->>Google シート: Google シートに接続
+    Streamlit アプリ->>Google シート: データをバックアップ (必要に応じて)
+    Google シート-->>Streamlit アプリ: 成功/失敗を返す
+    Streamlit アプリ-->>ユーザー: 結果をUIに更新
 ```

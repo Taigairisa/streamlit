@@ -1,26 +1,26 @@
 ```mermaid
 stateDiagram-v2
-    [*] --> Check_DB_File
-    Check_DB_File --> Initialize_DB: DB File Does Not Exist
-    Check_DB_File --> Display_UI: DB File Exists
-    Initialize_DB --> Connect_to_Google_Sheets: Initialize DB from Spreadsheet
-    Connect_to_Google_Sheets --> Get_Data_from_Google_Sheets: Initialize DB from Spreadsheet
-    Get_Data_from_Google_Sheets --> Create_SQLite_DB: Initialize DB from Spreadsheet
-    Create_SQLite_DB --> Display_UI: Initialize DB from Spreadsheet
-    Display_UI --> User_Interaction
-    User_Interaction --> Add_Data: User Selects "Add Data"
-    User_Interaction --> Edit_Data: User Selects "Edit Data"
-    User_Interaction --> Backup_Data: Automatic Backup Triggered
-    Add_Data --> Connect_to_SQLite_DB: Add Data
-    Connect_to_SQLite_DB --> Execute_INSERT_Query: Add Data
-    Execute_INSERT_Query --> Display_UI: Add Data
-    Edit_Data --> Connect_to_SQLite_DB: Edit Data
-    Connect_to_SQLite_DB --> Execute_UPDATE_DELETE_Query: Edit Data
-    Execute_UPDATE_DELETE_Query --> Display_UI: Edit Data
-    Backup_Data --> Connect_to_SQLite_DB: Backup Data
-    Connect_to_SQLite_DB --> Get_Data_from_SQLite_DB: Backup Data
-    Get_Data_from_SQLite_DB --> Connect_to_Google_Sheets: Backup Data
-    Connect_to_Google_Sheets --> Update_Google_Sheets: Backup Data
-    Update_Google_Sheets --> [*]: Backup Data
-    Display_UI --> [*]
+    [*] --> DBファイル確認
+    DBファイル確認 --> DB初期化: DBファイルが存在しない
+    DBファイル確認 --> UI表示: DBファイルが存在する
+    DB初期化 --> Googleスプレッドシートに接続: スプレッドシートからDBを初期化
+    Googleスプレッドシートに接続 --> Googleスプレッドシートからデータ取得: スプレッドシートからDBを初期化
+    Googleスプレッドシートからデータ取得 --> SQLite DB作成: スプレッドシートからDBを初期化
+    SQLite DB作成 --> UI表示: スプレッドシートからDBを初期化
+    UI表示 --> ユーザー操作
+    ユーザー操作 --> データ追加: ユーザーが「データ追加」を選択
+    ユーザー操作 --> データ編集: ユーザーが「データ編集」を選択
+    ユーザー操作 --> データバックアップ: 自動バックアップがトリガー
+    データ追加 --> SQLite DBに接続: データ追加
+    SQLite DBに接続 --> INSERTクエリ実行: データ追加
+    INSERTクエリ実行 --> UI表示: データ追加
+    データ編集 --> SQLite DBに接続: データ編集
+    SQLite DBに接続 --> UPDATE/DELETEクエリ実行: データ編集
+    UPDATE/DELETEクエリ実行 --> UI表示: データ編集
+    データバックアップ --> SQLite DBに接続: データバックアップ
+    SQLite DBに接続 --> SQLite DBからデータ取得: データバックアップ
+    SQLite DBからデータ取得 --> Googleスプレッドシートに接続: データバックアップ
+    Googleスプレッドシートに接続 --> Googleスプレッドシート更新: データバックアップ
+    Googleスプレッドシート更新 --> [*]: データバックアップ
+    UI表示 --> [*]
 ```
