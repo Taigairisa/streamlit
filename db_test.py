@@ -8,6 +8,7 @@ import pandas as pd
 from google.oauth2 import service_account
 import gspread
 import google.generativeai as genai
+import altair as alt
 # import streamlit_authenticator as stauth
 
 SHEET_KEY = st.secrets.SP_SHEET_KEY.key
@@ -519,103 +520,12 @@ if view_category == "グラフ":
     filtered_data = monthly_data[mask]
     
     # 収支グラフ
-    fig_flow = {
-        'data': [
-            {
-                'x': filtered_data.index,
-                'y': filtered_data['収入'],
-                'type': 'scatter',
-                'name': '収入',
-                'line': {'color': 'green'}
-            },
-            {
-                'x': filtered_data.index,
-                'y': filtered_data['支出'],
-                'type': 'scatter',
-                'name': '支出',
-                'line': {'color': 'red'}
-            }
-        ],
-        'layout': {
-            'title': '月次収支（2023年10月以降）',
-            'xaxis': {
-                'title': '月',
-                'type': 'date'
-            },
-            'yaxis': {
-                'title': '金額（円）',
-                'tickformat': ',d'
-            },
-            'updatemenus': [
-                {
-                    'buttons': [
-                        {
-                            'args': [{'yaxis': {'type': 'linear'}}],
-                            'label': '線形スケール',
-                            'method': 'relayout'
-                        },
-                        {
-                            'args': [{'yaxis': {'type': 'log'}}],
-                            'label': '対数スケール',
-                            'method': 'relayout'
-                        }
-                    ],
-                    'direction': 'down',
-                    'showactive': True,
-                    'x': 0.1,
-                    'y': 1.1
-                }
-            ]
-        }
-    }
+    st.subheader('月次収支（2023年10月以降）')
+    st.line_chart(filtered_data[['収入', '支出']])
     
     # 資産グラフ
-    fig_assets = {
-        'data': [
-            {
-                'x': filtered_data.index,
-                'y': filtered_data['累計資産'],
-                'type': 'scatter',
-                'name': '累計資産',
-                'line': {'color': 'blue'}
-            }
-        ],
-        'layout': {
-            'title': '累計資産推移（2023年10月以降）',
-            'xaxis': {
-                'title': '月',
-                'type': 'date'
-            },
-            'yaxis': {
-                'title': '金額（円）',
-                'tickformat': ',d'
-            },
-            'updatemenus': [
-                {
-                    'buttons': [
-                        {
-                            'args': [{'yaxis': {'type': 'linear'}}],
-                            'label': '線形スケール',
-                            'method': 'relayout'
-                        },
-                        {
-                            'args': [{'yaxis': {'type': 'log'}}],
-                            'label': '対数スケール',
-                            'method': 'relayout'
-                        }
-                    ],
-                    'direction': 'down',
-                    'showactive': True,
-                    'x': 0.1,
-                    'y': 1.1
-                }
-            ]
-        }
-    }
-    
-    # 2つのグラフを表示
-    st.plotly_chart(fig_flow)
-    st.plotly_chart(fig_assets)
+    st.subheader('累計資産推移（2023年10月以降）')
+    st.line_chart(filtered_data[['累計資産']])
     
     # データテーブルも表示
     st.write("### 月次データ")
