@@ -502,35 +502,70 @@ if view_category == "グラフ":
     # データ取得
     monthly_data = get_monthly_summary()
     
+    # 期間選択用のスライダー
+    dates = pd.to_datetime(monthly_data.index)
+    start_date = dates.min()
+    end_date = dates.max()
+    
+    selected_start, selected_end = st.select_slider(
+        "表示期間を選択",
+        options=dates,
+        value=(start_date, end_date),
+        format_func=lambda x: x.strftime("%Y-%m")
+    )
+    
+    # 選択された期間のデータでフィルタリング
+    mask = (dates >= selected_start) & (dates <= selected_end)
+    filtered_data = monthly_data[mask]
+    
     # 収支グラフ
     fig_flow = {
         'data': [
             {
-                'x': monthly_data.index,
-                'y': monthly_data['収入'],
+                'x': filtered_data.index,
+                'y': filtered_data['収入'],
                 'type': 'scatter',
                 'name': '収入',
                 'line': {'color': 'green'}
             },
             {
-                'x': monthly_data.index,
-                'y': monthly_data['支出'],
+                'x': filtered_data.index,
+                'y': filtered_data['支出'],
                 'type': 'scatter',
                 'name': '支出',
                 'line': {'color': 'red'}
-            },
-            {
-                'x': monthly_data.index,
-                'y': monthly_data['当月収支'],
-                'type': 'scatter',
-                'name': '当月収支',
-                'line': {'color': 'yellow'}
             }
         ],
         'layout': {
             'title': '月次収支（2023年10月以降）',
-            'xaxis': {'title': '月'},
-            'yaxis': {'title': '金額（円）'}
+            'xaxis': {
+                'title': '月',
+                'type': 'date'
+            },
+            'yaxis': {
+                'title': '金額（円）',
+                'tickformat': ',d'
+            },
+            'updatemenus': [
+                {
+                    'buttons': [
+                        {
+                            'args': [{'yaxis': {'type': 'linear'}}],
+                            'label': '線形スケール',
+                            'method': 'relayout'
+                        },
+                        {
+                            'args': [{'yaxis': {'type': 'log'}}],
+                            'label': '対数スケール',
+                            'method': 'relayout'
+                        }
+                    ],
+                    'direction': 'down',
+                    'showactive': True,
+                    'x': 0.1,
+                    'y': 1.1
+                }
+            ]
         }
     }
     
@@ -538,8 +573,8 @@ if view_category == "グラフ":
     fig_assets = {
         'data': [
             {
-                'x': monthly_data.index,
-                'y': monthly_data['累計資産'],
+                'x': filtered_data.index,
+                'y': filtered_data['累計資産'],
                 'type': 'scatter',
                 'name': '累計資産',
                 'line': {'color': 'blue'}
@@ -547,8 +582,34 @@ if view_category == "グラフ":
         ],
         'layout': {
             'title': '累計資産推移（2023年10月以降）',
-            'xaxis': {'title': '月'},
-            'yaxis': {'title': '金額（円）'}
+            'xaxis': {
+                'title': '月',
+                'type': 'date'
+            },
+            'yaxis': {
+                'title': '金額（円）',
+                'tickformat': ',d'
+            },
+            'updatemenus': [
+                {
+                    'buttons': [
+                        {
+                            'args': [{'yaxis': {'type': 'linear'}}],
+                            'label': '線形スケール',
+                            'method': 'relayout'
+                        },
+                        {
+                            'args': [{'yaxis': {'type': 'log'}}],
+                            'label': '対数スケール',
+                            'method': 'relayout'
+                        }
+                    ],
+                    'direction': 'down',
+                    'showactive': True,
+                    'x': 0.1,
+                    'y': 1.1
+                }
+            ]
         }
     }
     
@@ -558,7 +619,7 @@ if view_category == "グラフ":
     
     # データテーブルも表示
     st.write("### 月次データ")
-    st.dataframe(monthly_data.style.format('{:,.0f}'))
+    st.dataframe(filtered_data.style.format('{:,.0f}'))
 
 ## 開発者オプションページ
 if view_category == "開発者オプション":
