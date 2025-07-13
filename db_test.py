@@ -312,6 +312,47 @@ with st.sidebar:
             analysis = analyze_expenses(conn, selected_month)
             st.write(analysis)
 
+    # 贈与見える化機能
+    st.title("贈与見える化")
+    
+    # データ取得
+    conn = connect_db()
+    query = """
+    SELECT 
+        detail,
+        type,
+        SUM(amount) as total
+    FROM transactions
+    WHERE type IN ('収入', '支出') AND sub_category_id IN (
+        SELECT id FROM sub_categories WHERE name = '贈与'
+    )
+    GROUP BY detail, type;
+    """
+    df = pd.read_sql(query, conn)
+    conn.close()
+    
+    if df.empty:
+        st.warning("贈与に関するデータがありません。")
+    else:
+        # 贈与（収入）と返礼（支出）を比較
+        gifts = df[df['type'] == '収入'].set_index('detail')['total']
+        returns = df[df['type'] == '支出'].set_index('detail')['total']
+        
+        for gift in gifts.index:
+            gift_amount = gifts[gift]
+            
+            # 返礼額を判定（giftと同じ文字列が含まれている場合に一致）
+            return_amount = sum(
+                amount for detail, amount in returns.items() if gift in detail
+            )
+            
+            percentage = (return_amount / gift_amount) * 100 if gift_amount > 0 else 0
+            percentage = percentage if percentage <= 100 else 100
+            
+            st.write(f"贈与: {gift}")
+            st.write(f"返礼: {return_amount}円 / {gift_amount}円")
+            st.progress(percentage / 100)
+
     # 定期契約の通知
     conn = connect_db()
     cursor = conn.cursor()
