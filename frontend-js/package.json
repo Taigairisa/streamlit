@@ -1,0 +1,13 @@
+{
+  "name": "kakeibo-frontend",
+  "version": "1.0.0",
+  "description": "Simple Node.js frontend for Kakeibo app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test_utils.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
