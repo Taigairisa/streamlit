@@ -69,7 +69,7 @@ php artisan serve
 The JS frontend in `frontend-js` can be launched with Node.js. It communicates with the Laravel API and lets you manage transactions via a browser.
 
 ```bash
-cd ../frontend-js
+cd frontend-js
 npm install
 npm start
 ```
