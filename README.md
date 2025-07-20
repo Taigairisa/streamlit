@@ -56,3 +56,42 @@
 5.  フォームに記入して送信します。
 6.  データ概要ページで、表示するデータ（すべてのデータ、資産の傾向、カテゴリの支出、収入の傾向、定期契約の傾向、特別支出の傾向、旅行費用）を選択します。
 7.  データ削除ページで、削除する行を選択してフォームを送信します。
+
+## Laravel Backend & Node Frontend
+
+The `backend-laravel` directory contains a minimal API built with Laravel. Basic CRUD endpoints are available for main categories, sub categories and transactions. To start the API server:
+
+```bash
+cd backend-laravel
+php artisan serve
+```
+
+The JS frontend in `frontend-js` can be launched with Node.js. It communicates with the Laravel API and lets you manage transactions via a browser.
+
+```bash
+cd ../frontend-js
+npm install
+npm start
+```
+
+Open `http://localhost:3000` in your browser while the Laravel backend is running on port `8000`.
+
+The frontend supports filtering transactions by month range and visualizes income, expense and asset trends in a Chart.js graph.
+
+## Testing
+
+Run API tests inside the Laravel directory:
+
+```bash
+cd backend-laravel
+composer install
+php artisan test
+```
+
+Run frontend utility tests:
+
+```bash
+cd ../frontend-js
+npm test
+```
+
