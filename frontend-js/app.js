@@ -3,17 +3,47 @@ document.addEventListener('DOMContentLoaded', () => {
     const subCategorySelect = document.getElementById('sub-category');
     const transactionsTableBody = document.getElementById('transactions-table-body');
     const addTransactionForm = document.getElementById('add-transaction-form');
+    const submitBtn = addTransactionForm.querySelector('button[type="submit"]');
+    const startMonthInput = document.getElementById('start-month');
+    const endMonthInput = document.getElementById('end-month');
+    const filterMainSelect = document.getElementById('filter-main-category');
+    const filterSubSelect = document.getElementById('filter-sub-category');
+    const filterBtn = document.getElementById('filter-btn');
+    const chartCanvas = document.getElementById('line-chart');
+    const pageSelect = document.getElementById('page-select');
+    const pageInput = document.getElementById('page-input');
+    const pageData = document.getElementById('page-data');
+    const pageDelete = document.getElementById('page-delete');
+    const deleteTableBody = document.getElementById('delete-table-body');
+    const deleteBtn = document.getElementById('delete-btn');
+    let chart = null;
+    let editingId = null;
 
     const apiUrl = 'http://localhost:8000/api';
 
     let mainCategories = [];
     let subCategories = [];
+    let allTransactions = [];
+
+    function showPage(name) {
+        pageInput.style.display = 'none';
+        pageData.style.display = 'none';
+        pageDelete.style.display = 'none';
+        if (name === 'input') pageInput.style.display = 'block';
+        if (name === 'data') pageData.style.display = 'block';
+        if (name === 'delete') pageDelete.style.display = 'block';
+    }
 
     async function fetchMainCategories() {
         const response = await fetch(`${apiUrl}/main_categories`);
         mainCategories = await response.json();
         mainCategorySelect.innerHTML = mainCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        if (filterMainSelect) {
+            filterMainSelect.innerHTML = `<option value="">すべて</option>` +
+                mainCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        }
         fetchSubCategories();
+        updateFilterSubCategories();
     }
 
     async function fetchSubCategories() {
@@ -22,11 +52,18 @@ document.addEventListener('DOMContentLoaded', () => {
         subCategories = await response.json();
         const filteredSubCategories = subCategories.filter(sc => sc.main_category_id == mainCategoryId);
         subCategorySelect.innerHTML = filteredSubCategories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        updateFilterSubCategories();
     }
 
-    async function fetchTransactions() {
-        const response = await fetch(`${apiUrl}/transactions`);
-        const transactions = await response.json();
+    function updateFilterSubCategories() {
+        if (!filterSubSelect) return;
+        const mainId = filterMainSelect.value;
+        const filtered = subCategories.filter(sc => !mainId || sc.main_category_id == mainId);
+        filterSubSelect.innerHTML = `<option value="">すべて</option>` +
+            filtered.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    function renderTable(transactions) {
         transactionsTableBody.innerHTML = transactions.map(t => {
             const subCategory = subCategories.find(sc => sc.id === t.sub_category_id);
             const mainCategory = mainCategories.find(mc => mc.id === (subCategory ? subCategory.main_category_id : null));
@@ -39,11 +76,73 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${t.detail}</td>
                     <td>${t.amount}</td>
                     <td>
-                        <button class="btn btn-danger btn-sm" onclick="deleteTransaction(${t.id})">Delete</button>
+                        <button class="btn btn-secondary btn-sm" onclick="editTransaction(${t.id})">編集</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTransaction(${t.id})">削除</button>
                     </td>
                 </tr>
             `;
         }).join('');
+    }
+
+    function renderChart(transactions) {
+        const data = utils.monthlyChartData(transactions);
+        if (chart) {
+            chart.destroy();
+        }
+        chart = new Chart(chartCanvas, {
+            type: 'line',
+            data: {
+                labels: data.months,
+                datasets: [
+                    { label: '収入', data: data.income, borderColor: 'green', fill: false },
+                    { label: '支出', data: data.expense, borderColor: 'red', fill: false },
+                    { label: '資産', data: data.asset, borderColor: 'blue', fill: false }
+                ]
+            }
+        });
+    }
+
+    function renderDeleteTable(transactions) {
+        if (!deleteTableBody) return;
+        deleteTableBody.innerHTML = transactions.map(t => {
+            const subCategory = subCategories.find(sc => sc.id === t.sub_category_id);
+            const mainCategory = mainCategories.find(mc => mc.id === (subCategory ? subCategory.main_category_id : null));
+            return `
+                <tr>
+                    <td><input type="checkbox" value="${t.id}"></td>
+                    <td>${t.date}</td>
+                    <td>${mainCategory ? mainCategory.name : ''}</td>
+                    <td>${subCategory ? subCategory.name : ''}</td>
+                    <td>${t.type}</td>
+                    <td>${t.detail}</td>
+                    <td>${t.amount}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function applyFilter() {
+        let filtered = utils.filterTransactions(allTransactions, startMonthInput.value, endMonthInput.value);
+        const mainId = filterMainSelect.value;
+        const subId = filterSubSelect.value;
+        if (mainId) {
+            filtered = filtered.filter(t => {
+                const sub = subCategories.find(sc => sc.id === t.sub_category_id);
+                return sub && String(sub.main_category_id) === mainId;
+            });
+        }
+        if (subId) {
+            filtered = filtered.filter(t => String(t.sub_category_id) === subId);
+        }
+        renderTable(filtered);
+        renderChart(filtered);
+    }
+
+    async function fetchTransactions() {
+        const response = await fetch(`${apiUrl}/transactions`);
+        allTransactions = await response.json();
+        applyFilter();
+        renderDeleteTable(allTransactions);
     }
 
     async function addTransaction(e) {
@@ -56,14 +155,27 @@ document.addEventListener('DOMContentLoaded', () => {
             amount: document.getElementById('amount').value,
         };
 
-        await fetch(`${apiUrl}/transactions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify(transaction),
-        });
+        if (editingId) {
+            await fetch(`${apiUrl}/transactions/${editingId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(transaction),
+            });
+            submitBtn.textContent = '追加';
+            editingId = null;
+        } else {
+            await fetch(`${apiUrl}/transactions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(transaction),
+            });
+        }
         addTransactionForm.reset();
         fetchTransactions();
     }
@@ -75,8 +187,31 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchTransactions();
     }
 
-    mainCategorySelect.addEventListener('change', fetchSubCategories);
-    addTransactionForm.addEventListener('submit', addTransaction);
+    window.editTransaction = async function(id) {
+        const response = await fetch(`${apiUrl}/transactions/${id}`);
+        const t = await response.json();
+        document.getElementById('sub-category').value = t.sub_category_id;
+        document.getElementById('date').value = t.date;
+        document.getElementById('type').value = t.type;
+        document.getElementById('detail').value = t.detail;
+        document.getElementById('amount').value = t.amount;
+        editingId = id;
+        submitBtn.textContent = '更新';
+    }
 
-    fetchMainCategories().then(fetchTransactions);
+    deleteBtn.addEventListener('click', async () => {
+        const ids = Array.from(deleteTableBody.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+        for (const id of ids) {
+            await fetch(`${apiUrl}/transactions/${id}`, {method:'DELETE'});
+        }
+        fetchTransactions();
+    });
+
+    pageSelect.addEventListener('change', () => showPage(pageSelect.value));
+    mainCategorySelect.addEventListener('change', fetchSubCategories);
+    filterMainSelect.addEventListener('change', () => { updateFilterSubCategories(); });
+    addTransactionForm.addEventListener('submit', addTransaction);
+    filterBtn.addEventListener('click', (e) => { e.preventDefault(); applyFilter(); });
+
+    fetchMainCategories().then(() => { showPage('input'); fetchTransactions(); });
 });

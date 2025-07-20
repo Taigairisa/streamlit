@@ -1,0 +1,7 @@
+/* hide all sections by default */
+.page-section {
+  display: none;
+}
+
+/* allow first page to be visible on load via inline style or JS */
+
