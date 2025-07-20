@@ -63,8 +63,14 @@ The `backend-laravel` directory contains a minimal API built with Laravel. Basic
 
 ```bash
 cd backend-laravel
+composer install
+php artisan migrate --seed
 php artisan serve
 ```
+
+The `migrate --seed` command creates the schema and loads sample categories and
+transactions from `kakeibo_data.json`. Run it once when setting up the backend
+locally or whenever you want to reset the data.
 
 The JS frontend in `frontend-js` can be launched with Node.js. It communicates with the Laravel API and lets you manage transactions via a browser.
 
