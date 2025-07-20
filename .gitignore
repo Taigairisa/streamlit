@@ -3,3 +3,6 @@ test.py
 secrets.toml
 inventory.db
 kakeibo.db
+# Laravel
+backend/vendor/
+backend/.env
