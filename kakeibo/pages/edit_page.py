@@ -34,7 +34,7 @@ def render(main_category_id: int, sub_categories: list):
     df = df.reset_index(drop=True)
 
     can_edit_num_rows = "dynamic" if st.toggle("データを追加する") else "fixed"
-    edited_df = st.data_editor(
+    st.data_editor(
         df.drop(columns=["sub_category_id"]),
         disabled=["id"],
         num_rows=can_edit_num_rows,

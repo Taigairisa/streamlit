@@ -4,7 +4,6 @@ Lightweight smoke checks for kakeibo_st.
 Run: python scripts/smoke_check.py
 """
 from datetime import datetime
-import sys
 
 import pandas as pd
 from sqlalchemy import text

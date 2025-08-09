@@ -104,7 +104,7 @@ def render_sidebar():
                     type_ = transaction[5]
                     st.sidebar.write(f"● {detail}  (前回入力 {date_str})")
                     new_amount = st.sidebar.number_input(f"{type_}額", key=f"add_amount_data_{id} ", value=amount)
-                    new_date = st.sidebar.date_input(f"今回の日付", key=f"add_date_data_{id} ", value=today)
+                    new_date = st.sidebar.date_input("今回の日付", key=f"add_date_data_{id} ", value=today)
                     if st.sidebar.button(f"{detail}のデータを追加", key=f"add_data_{id}"):
                         with engine.begin() as conn:
                             conn.execute(
