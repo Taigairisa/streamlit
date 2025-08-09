@@ -313,10 +313,10 @@ def get_monthly_summary():
 #     initialize_db_from_spreadsheet(conn)
 
 with st.sidebar:
-    if st.secrets.get("IS_PRODUCTION", False):
-        st.write("## 本番環境")
-    else:
-        st.write("## 開発環境")
+    # if st.secrets.get("IS_PRODUCTION", False):
+    #     st.write("## 本番環境")
+    # else:
+    #     st.write("## 開発環境")
     view_category = st.selectbox(
     label="ページ変更",
     options=["追加", "編集", "カテゴリー追加・編集", "グラフ", "開発者オプション"]
