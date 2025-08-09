@@ -1,0 +1,39 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title{font:600 22px system-ui,Segoe UI,Roboto,Arial}
+      .text{font:14px system-ui,Segoe UI,Roboto,Arial}
+      .muted{opacity:.7}
+    </style>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2f7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect x="40" y="40" width="200" height="640" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+  <text x="60" y="80" class="title">メニュー</text>
+  <g class="text muted">
+    <text x="60" y="120">・追加</text>
+    <text x="60" y="150">・編集</text>
+    <text x="60" y="180">・カテゴリー追加・編集</text>
+    <text x="60" y="210">・グラフ</text>
+    <text x="60" y="240">・開発者オプション</text>
+  </g>
+  <rect x="260" y="40" width="980" height="300" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+  <text x="280" y="80" class="title">予算進捗（サンプル）</text>
+  <rect x="280" y="110" width="900" height="20" rx="10" fill="#f1f5f9"/>
+  <rect x="280" y="110" width="540" height="20" rx="10" fill="#60a5fa"/>
+  <text x="280" y="150" class="text muted">日常 合計: 54,000 / 90,000</text>
+  <rect x="260" y="360" width="980" height="320" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+  <text x="280" y="400" class="title">月次サマリ（サンプル）</text>
+  <rect x="300" y="430" width="160" height="200" fill="#93c5fd"/>
+  <rect x="480" y="460" width="160" height="170" fill="#fca5a5"/>
+  <rect x="660" y="420" width="160" height="210" fill="#93c5fd"/>
+  <rect x="840" y="500" width="160" height="130" fill="#fca5a5"/>
+  <text x="300" y="650" class="text muted">2024-04</text>
+  <text x="480" y="650" class="text muted">2024-05</text>
+  <text x="660" y="650" class="text muted">2024-06</text>
+  <text x="840" y="650" class="text muted">2024-07</text>
+</svg>
+

@@ -1,6 +1,35 @@
-.streamlit
-test.py
-secrets.toml
+# Python / tools
+__pycache__/
+*.py[cod]
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Editors/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+
+# App/runtime
+runtime-data/
 inventory.db
 kakeibo.db
+
+# Streamlit secrets（機密）
+.streamlit/secrets.toml
+secrets.toml
 service_account.json
+
+# Local scratch
+test.py

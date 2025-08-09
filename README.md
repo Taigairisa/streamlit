@@ -1,58 +1,159 @@
-# 家計簿アプリ
+<div align="center">
 
-## 説明
+  <img src="docs/assets/logo.svg" alt="Kakeibo ST" width="520" />
 
-これは、家計を管理するためのStreamlitアプリです。ユーザーは、支出、収入、定期契約、特別支出、および旅行の費用を入力できます。また、支出、収入、および資産の傾向のデータ視覚化を提供します。
+  <p>
+    シンプルでサクッと使える、Streamlit + SQLite 家計簿
+  </p>
 
-## インストール
+  <p>
+    <a href="https://img.shields.io/badge/Python-3.12-blue"> <img src="https://img.shields.io/badge/Python-3.12-blue" alt="Python" /></a>
+    <a href="https://img.shields.io/badge/Streamlit-1.35-ff4b4b"> <img src="https://img.shields.io/badge/Streamlit-1.35-ff4b4b" alt="Streamlit" /></a>
+    <a href="https://img.shields.io/badge/DB-SQLite-003b57"> <img src="https://img.shields.io/badge/DB-SQLite-003b57" alt="SQLite" /></a>
+    <a href="https://img.shields.io/badge/Package-uv-4b8bbe"> <img src="https://img.shields.io/badge/Package-uv-4b8bbe" alt="uv" /></a>
+    <a href="https://img.shields.io/badge/Container-Docker-2496ed"> <img src="https://img.shields.io/badge/Container-Docker-2496ed" alt="Docker" /></a>
+  </p>
 
-1.  リポジトリをクローンします。
-2.  依存関係をインストールします。
+</div>
 
-    ```
-    pip install -r requirements.txt
-    ```
+---
 
-    依存関係は次のとおりです。
+## 概要
 
-    ```
-    altair==5.4.0
-    google==3.0.0
-    google-api-core==2.19.1
-    google-api-python-client==2.142.0
-    google-auth==2.23.2
-    google-auth-httplib2==0.2.0
-    google-auth-oauthlib==1.1.0
-    googleapis-common-protos==1.63.2
-    gspread==5.11.3
-    matplotlib==3.9.2
-    numpy==1.26.4
-    oauthlib==3.2.2
-    pandas==2.2.2
-    pillow==10.4.0
-    requests==2.32.3
-    requests-oauthlib==2.0.0
-    seaborn==0.13.2
-    SQLAlchemy==2.0.32
-    streamlit==1.35.0
-    toml==0.10.2
-    uritemplate==4.1.1
-    urllib3==2.2.2
-    google-auth==2.23.2
-    gspread==5.11.3
-    pygwalker == 0.4.9.13
-    ```
+Python/Streamlit 製のシンプルな家計簿アプリです。データは SQLite に保存され、Docker/Fly.io での運用を前提に永続ボリューム（`/data/kakeibo.db`）へ書き込みます。サイドバーから「追加」「編集」「カテゴリー追加・編集」「グラフ」「開発者オプション」を切り替えて利用します。
 
-## 使い方
+主な機能
+- 追加: 日付・種別（支出/収入/予算）・詳細・小カテゴリを選んで登録
+- 編集: 期間絞り込み＋表形式編集（追加/更新/削除）と合計表示
+- カテゴリー追加・編集: 小カテゴリの追加/リネーム（大カテゴリは初期データ）
+- グラフ: 月次の収入/支出と累計資産推移（2023-10以降）
+- 予算進捗: 指定月の「日常」カテゴリの予算対比プログレス表示
+- 贈与見える化: 「贈与」小カテゴリの収入と返礼（支出）を対比
+- 開発者オプション: DB ダウンロード、任意 SQL 実行（バックアップ関連は現状オフ）
 
-1.  アプリを実行します。
+補足
+- Google スプレッドシート連携/Gemini による分析コードはリポジトリ内にありますが、現状はコメントアウトされており未使用です。
+- 初期データ（シード）は `data/kakeibo.db` に同梱。初回起動時に `/data/kakeibo.db` へコピーされます（Docker 実行時）。
 
-    ```
-    streamlit run streamlit_app.py
-    ```
-2.  ブラウザでアプリを開きます。
-3.  サイドバーを使用して、入力フォーム、データ概要、およびデータ削除ページをナビゲートします。
-4.  入力フォームページで、データを入力するカテゴリ（支出、収入、定期契約、特別支出、旅行費用、予算、残高）を選択します。
-5.  フォームに記入して送信します。
-6.  データ概要ページで、表示するデータ（すべてのデータ、資産の傾向、カテゴリの支出、収入の傾向、定期契約の傾向、特別支出の傾向、旅行費用）を選択します。
-7.  データ削除ページで、削除する行を選択してフォームを送信します。
+## 構成 / 技術スタック
+
+- 言語: Python 3.12
+- フレームワーク: Streamlit
+- データベース: SQLite（パス: `/data/kakeibo.db`）
+- データアクセス: SQLAlchemy Core（パラメータ化クエリ）
+- パッケージ管理: `uv`（推奨。Docker も `uv` 使用）
+- デプロイ: Fly.io（`fly.toml` 同梱）
+
+主なテーブル
+- `main_categories(id, name)`
+- `sub_categories(id, main_category_id, name)`
+- `transactions(id, sub_category_id, amount, type['支出','収入','予算'], date, detail)`
+- `backup_time(id, time)`
+
+## セットアップ（ローカル）
+
+前提: Python 3.12 以上。
+
+依存関係のインストール（推奨順）
+- `uv sync`（推奨）
+- 参考: `pip install -r requirements.txt`（uv を使わない場合）
+
+注意（重要）
+- 既定のデータディレクトリは `/data` です。権限の都合で書き込めない環境では自動で `./runtime-data` にフォールバックします。
+- 明示的に保存先を変えたい場合は環境変数 `KAKEIBO_DATA_DIR` を指定してください（例: `KAKEIBO_DATA_DIR=./runtime-data`）。
+
+起動
+- `uv run streamlit run app.py`
+- ブラウザで `http://localhost:8501` を開く
+
+初期データ
+- 同梱の `data/kakeibo.db` を利用したい場合は、`/data/kakeibo.db` にコピーしてください（Docker 実行では自動）。
+
+## スクリーンショット
+
+<p align="center">
+  <img src="docs/assets/screenshot-dashboard.svg" alt="Dashboard" width="720" />
+  <br/>
+  <em>ダッシュボード（予算進捗 / 月次サマリのイメージ）</em>
+  </p>
+
+<p align="center">
+  <img src="docs/assets/screenshot-edit.svg" alt="Edit" width="720" />
+  <br/>
+  <em>編集画面（表形式の編集イメージ）</em>
+</p>
+
+## Docker で実行（推奨）
+
+永続ボリュームをマウントして起動する例:
+
+```
+docker build -t kakeibo-st .
+docker run --rm -p 8501:8501 -v $(pwd)/runtime-data:/data kakeibo-st
+```
+
+メモ
+- 初回起動時、`data/kakeibo.db` があれば `/data/kakeibo.db` へコピー、無ければ空スキーマを生成します（`start.sh`）。
+- データはホストの `./runtime-data/kakeibo.db` に永続化されます。
+
+## Fly.io へデプロイ
+
+前提: Fly CLI セットアップ済み、ボリュームを `/data` にマウントする設定は `fly.toml` に記載済み。
+
+おおまかな流れ（例）
+1. `fly launch`（既存アプリ名を使う場合はスキップ）
+2. `fly volumes create data --size 1`（必要なら）
+3. `fly deploy`
+
+デプロイ後、アプリはポート `8501` で待ち受けます。
+
+## テスト（簡易）
+
+- スモークチェック（外部依存なし、読み取り中心）
+  - `uv run scripts/smoke_check.py`
+- pytest（任意）
+  - `uv run --with pytest -m pytest -q`
+
+## 設定 / シークレット
+
+- `.streamlit/secrets.toml` を利用可能です（例: Google API、スプレッドシート連携）。ただし現状のアプリではスプレッドシート連携・Gemini は無効化されています。
+- 機密情報はコミットしないでください（`.gitignore` で `secrets.toml`/`service_account.json` を無視済み）。必要に応じて環境変数や Secrets 管理をご利用ください。
+
+## 開発用コマンド（uv）
+
+- 依存解決: `uv sync`
+- アプリ起動: `uv run streamlit run app.py`
+- スモークテスト: `uv run scripts/smoke_check.py`
+- pytest: `uv run --with pytest -m pytest -q`
+
+## 画面の使い方（概要）
+
+- サイドバー
+  - ページ切替（追加/編集/カテゴリー追加・編集/グラフ/開発者オプション）
+  - 月選択（予算進捗表示）
+  - 贈与見える化（贈与→返礼のプログレス）
+  - 未入力の月額リマインド（直近入力日から1か月経過の定期項目）
+- 追加
+  - 大カテゴリ→小カテゴリを選択し、「支出/収入/予算」「日付」「詳細」「金額」を入力して保存
+- 編集
+  - 小カテゴリと期間を指定して一覧を編集（行の追加/更新/削除）。合計支出/予算を表示
+- カテゴリー追加・編集
+  - 小カテゴリの追加/リネーム（大カテゴリは初期データに依存）
+- グラフ
+  - 月次の収入/支出、累計資産を期間スライダーで表示
+- 開発者オプション
+  - DB ダウンロード、任意 SQL 実行（バックアップ/スプレッドシート同期はコメントアウト中）
+
+## 既知の注意点
+
+- ローカル実行時に `/data` を作成できないとエラーになる場合があります（Docker を推奨）。
+- Google スプレッドシート連携・Gemini 分析は現状無効化されています（コードは残置）。
+- 一部の依存パッケージは将来的機能用に含まれていますが、未使用のものがあります。
+
+## ライセンス
+
+プロジェクトのライセンスは未定義です。公開・再配布はリポジトリ作者の意向に従ってください。
+
+---
+
+この README は Laravel の README 構成を参考に、見出し・ロゴ・バッジ・スクリーンショットを追加して可読性を高めています。画像差し替え（PNG/JPG など）を行う場合は `docs/assets/` 配下に配置し、本文の参照先を更新してください。

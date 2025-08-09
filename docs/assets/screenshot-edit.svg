@@ -1,0 +1,43 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title{font:600 22px system-ui,Segoe UI,Roboto,Arial}
+      .text{font:14px system-ui,Segoe UI,Roboto,Arial}
+      .muted{opacity:.7}
+    </style>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#eef2f7"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg2)"/>
+  <rect x="40" y="40" width="1200" height="640" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+  <text x="60" y="80" class="title">編集（サンプル）</text>
+  <g class="text muted">
+    <text x="60" y="110">期間: 2024-06-01 〜 2024-06-30 / カテゴリ: 日常 → 食費</text>
+  </g>
+  <g>
+    <rect x="60" y="130" width="1160" height="32" fill="#f8fafc"/>
+    <text x="80" y="152" class="text muted">日付</text>
+    <text x="260" y="152" class="text muted">種別</text>
+    <text x="420" y="152" class="text muted">詳細</text>
+    <text x="900" y="152" class="text muted">金額</text>
+  </g>
+  <g class="text">
+    <text x="80" y="190">2024-06-03</text>
+    <text x="260" y="190">支出</text>
+    <text x="420" y="190">スーパー</text>
+    <text x="900" y="190">-2,130</text>
+
+    <text x="80" y="230">2024-06-10</text>
+    <text x="260" y="230">支出</text>
+    <text x="420" y="230">テイクアウト</text>
+    <text x="900" y="230">-1,280</text>
+
+    <text x="80" y="270">2024-06-20</text>
+    <text x="260" y="270">予算</text>
+    <text x="420" y="270">6月 食費予算</text>
+    <text x="900" y="270">30,000</text>
+  </g>
+</svg>
+

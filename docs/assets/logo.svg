@@ -1,0 +1,14 @@
+<svg width="640" height="200" viewBox="0 0 640 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00b4d8"/>
+      <stop offset="100%" stop-color="#48cae4"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="640" height="200" rx="16" fill="url(#g)"/>
+  <g fill="#FFFFFF" font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">
+    <text x="40" y="90" font-size="48" font-weight="700">Kakeibo ST</text>
+    <text x="40" y="135" font-size="20" opacity="0.9">Streamlit + SQLite 家計簿</text>
+  </g>
+</svg>
+
