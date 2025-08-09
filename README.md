@@ -107,6 +107,28 @@ docker run --rm -p 8501:8501 -v $(pwd)/runtime-data:/data kakeibo-st
 
 デプロイ後、アプリはポート `8501` で待ち受けます。
 
+## GitHub Actions（CD）
+
+main ブランチに push したら自動で Fly.io にデプロイするワークフローを同梱しています（`.github/workflows/fly-deploy.yml`）。
+
+準備
+- リポジトリ Secrets に `FLY_API_TOKEN` を登録（`fly auth token` で取得）
+- 任意（環境変数運用）: `AUTH_ENABLED` / `AUTH_SALT` / `AUTH_USERS_JSON` を Secrets に登録
+- 任意: リポジトリ Variables に `FLY_APP_NAME`（`fly.toml` の app 名）、`FLY_REGION`（例: `sjc`）を登録
+
+実行タイミング
+- `main` への push、または Actions から手動実行（workflow_dispatch）
+
+ワークフローの動き
+- flyctl をセットアップ
+- ボリューム `data` が無ければ作成（`FLY_REGION` または `fly.toml` の `primary_region` を使用）
+- `AUTH_*` の Secrets があれば Fly の runtime secrets に反映
+- `flyctl deploy --remote-only` でデプロイ
+
+注意
+- `AUTH_USERS_JSON` は JSON 文字列です。例: `{"viewer":"plain:password","admin":"sha256:<64hex>"}`（Secrets にそのまま貼り付け）
+- アプリ名やリージョンは `fly.toml` が優先。変えたい場合は Variables の `FLY_APP_NAME`/`FLY_REGION` を設定
+
 ## テスト（簡易）
 
 - スモークチェック（外部依存なし、読み取り中心）
@@ -118,6 +140,31 @@ docker run --rm -p 8501:8501 -v $(pwd)/runtime-data:/data kakeibo-st
 
 - `.streamlit/secrets.toml` を利用可能です（例: Google API、スプレッドシート連携）。ただし現状のアプリではスプレッドシート連携・Gemini は無効化されています。
 - 機密情報はコミットしないでください（`.gitignore` で `secrets.toml`/`service_account.json` を無視済み）。必要に応じて環境変数や Secrets 管理をご利用ください。
+
+### 認証（任意・簡易）
+アプリ起動時にログインを要求する簡易認証を用意しています。`secrets.toml` に以下を設定すると有効化されます。
+
+```
+[auth]
+enabled = true
+salt = "change-me"  # sha256 用のソルト
+
+[auth.users]
+# 平文（ローカル用）
+viewer = "plain:password123"
+# ハッシュ（本番推奨）: sha256(salt + password) の 16 進文字列
+admin = "sha256:<hex_digest>"
+```
+
+補足
+- 認証が無効（`enabled = false`）またはユーザー未設定の場合、ログインなしで利用できます。
+- ログアウトはサイドバーの「ログアウト」ボタンから可能です。
+- secrets.toml が無い場合でも警告が出ないようにしています（自動で無効化）。
+- 環境変数で渡すことも可能です（コンテナ運用向け）。例:
+  - `AUTH_ENABLED=true`
+  - `AUTH_SALT=your-random-salt`
+  - `AUTH_USERS_JSON='{"viewer":"plain:password123","admin":"sha256:..."}'`
+  - Docker: `docker run -e AUTH_ENABLED=true -e AUTH_SALT=... -e AUTH_USERS_JSON='...' ...`
 
 ## 開発用コマンド（uv）
 

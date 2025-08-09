@@ -3,9 +3,13 @@ import streamlit as st
 from kakeibo.db import connect_db, get_categories
 from kakeibo.views.sidebar import render_sidebar
 from kakeibo.pages import add_page, edit_page, categories_page, graphs_page, dev_page
+from kakeibo.auth import ensure_authenticated
 
 
 def main():
+    # 認証（有効な場合のみ遮断）
+    _user = ensure_authenticated()
+
     view_category = render_sidebar()
 
     engine = connect_db()
