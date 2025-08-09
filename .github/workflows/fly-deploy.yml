@@ -35,21 +35,31 @@ jobs:
           fi
 
       - name: Set runtime secrets (optional)
-        if: ${{ secrets.AUTH_ENABLED != '' || secrets.AUTH_SALT != '' || secrets.AUTH_USERS_JSON != '' }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ vars.FLY_APP_NAME }}
+          AUTH_ENABLED: ${{ secrets.AUTH_ENABLED }}
+          AUTH_SALT: ${{ secrets.AUTH_SALT }}
+          AUTH_USERS_JSON: ${{ secrets.AUTH_USERS_JSON }}
         run: |
           set -e
           APP=${FLY_APP_NAME:-$(awk -F'"' '/^app\s*=/{print $2; exit}' fly.toml)}
-          if [ -n "${{ secrets.AUTH_ENABLED }}" ]; then
-            flyctl secrets set AUTH_ENABLED=${{ secrets.AUTH_ENABLED }} --app "$APP"
+
+          # どれか一つでもセットされていれば実行、全部空ならスキップ
+          if [ -z "${AUTH_ENABLED}${AUTH_SALT}${AUTH_USERS_JSON}" ]; then
+            echo "No auth-related secrets provided; skipping secrets set."
+            exit 0
           fi
-          if [ -n "${{ secrets.AUTH_SALT }}" ]; then
-            flyctl secrets set AUTH_SALT='${{ secrets.AUTH_SALT }}' --app "$APP"
+
+          if [ -n "$AUTH_ENABLED" ]; then
+            flyctl secrets set AUTH_ENABLED="$AUTH_ENABLED" --app "$APP"
           fi
-          if [ -n "${{ secrets.AUTH_USERS_JSON }}" ]; then
-            flyctl secrets set AUTH_USERS_JSON='${{ secrets.AUTH_USERS_JSON }}' --app "$APP"
+          if [ -n "$AUTH_SALT" ]; then
+            flyctl secrets set AUTH_SALT="$AUTH_SALT" --app "$APP"
+          fi
+          if [ -n "$AUTH_USERS_JSON" ]; then
+            # JSONはクォート崩れしやすいので必ずダブルクォートで包む
+            flyctl secrets set AUTH_USERS_JSON="$AUTH_USERS_JSON" --app "$APP"
           fi
 
       - name: Deploy
