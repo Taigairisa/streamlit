@@ -1,0 +1,31 @@
+[project]
+name = "kakeibo-st"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "altair==5.4.0",
+    "google==3.0.0",
+    "google-api-core==2.19.1",
+    "google-api-python-client==2.142.0",
+    "google-auth==2.23.2",
+    "google-auth-httplib2==0.2.0",
+    "google-auth-oauthlib==1.1.0",
+    "google-generativeai==0.8.4",
+    "googleapis-common-protos==1.63.2",
+    "gspread==5.11.3",
+    "matplotlib==3.9.2",
+    "numpy==1.26.4",
+    "oauthlib==3.2.2",
+    "pandas==2.2.2",
+    "pillow==10.4.0",
+    "plotly==6.1.0",
+    "pygwalker==0.4.9.13",
+    "requests==2.32.3",
+    "requests-oauthlib==2.0.0",
+    "seaborn==0.13.2",
+    "sqlalchemy==2.0.32",
+    "streamlit==1.35.0",
+    "toml==0.10.2",
+    "uritemplate==4.1.1",
+    "urllib3==2.2.2",
+]

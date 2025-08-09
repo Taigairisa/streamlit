@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 import sqlite3
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
@@ -9,13 +10,47 @@ from google.oauth2 import service_account
 import gspread
 import google.generativeai as genai
 import altair as alt
+import os, json
 # import streamlit_authenticator as stauth
 
-SHEET_KEY = st.secrets.SP_SHEET_KEY.key
+def _bool(s): return str(s).lower() in ("1","true","yes","on")
+
+def get_secret():
+    if "SP_SHEET_KEY" in os.environ:
+        return {
+            "SP_SHEET_KEY": {"key": os.environ["SP_SHEET_KEY"]},
+            "gcp_service_account": json.loads(os.environ["GCP_SERVICE_ACCOUNT"]),
+            "GEMINI_API": {"api_key": os.environ["GEMINI_API_KEY"]},
+            "IS_PRODUCTION": _bool(os.environ.get("IS_PRODUCTION", "false")),
+        }
+    else:
+        return {
+            "SP_SHEET_KEY": {"key": st.secrets.SP_SHEET_KEY.key},
+            "gcp_service_account": st.secrets["gcp_service_account"],
+            "GEMINI_API": {"api_key": st.secrets.GEMINI_API.api_key},
+            "IS_PRODUCTION": st.secrets.get("IS_PRODUCTION", False),
+        }
+
+_secrets = get_secret()
+SHEET_KEY = _secrets["SP_SHEET_KEY"]["key"]
 SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-SERVICE_ACCOUNT = st.secrets["gcp_service_account"]
-GEMINI_API_KEY = st.secrets.GEMINI_API.api_key
-DB_FILENAME = Path(__file__).parent / "kakeibo.db"
+SERVICE_ACCOUNT = _secrets["gcp_service_account"]
+GEMINI_API_KEY = _secrets["GEMINI_API"]["api_key"]
+IS_PRODUCTION = _secrets["IS_PRODUCTION"]
+
+# 1) 実運用DBの場所（ボリューム）
+RUNTIME_DB_DIR = Path("/data")
+RUNTIME_DB_DIR.mkdir(parents=True, exist_ok=True)
+DB_FILENAME = RUNTIME_DB_DIR / "kakeibo.db"
+
+# 2) 初回だけ、リポ内の“種”をコピー（種が無ければスキーマ作成に切替）
+SEED_DB = Path(__file__).parent / "data" / "seed.db"   # ← リポに置く初期DB
+if not DB_FILENAME.exists():
+    if SEED_DB.exists():
+        shutil.copy2(SEED_DB, DB_FILENAME)
+    else:
+        # ここでスキーマ作成処理（CREATE TABLE…）を走らせてもOK
+        pass
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-pro-002")
