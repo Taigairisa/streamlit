@@ -1,0 +1,19 @@
+# ./fly.toml
+app = "kakeibo-app"  # launch時の名前に合わせる
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  TZ = "Asia/Tokyo"
+
+[http_service]
+  internal_port = 8501
+  auto_start_machines = true
+  auto_stop_machines = false
+  min_machines_running = 1
+
+# SQLiteを永続化するためのボリューム
+[[mounts]]
+  source = "data"
+  destination = "/data"

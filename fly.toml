@@ -1,7 +1,5 @@
-app = "your-app-name"  # ← flyctl launch 時に自動生成でOK
-
-# ./fly.toml
-app = "kakeibo-app"  # launch時の名前に合わせる
+app = "kakeibo-app"
+primary_region = "sjc"
 
 [build]
   dockerfile = "Dockerfile"
@@ -11,11 +9,17 @@ app = "kakeibo-app"  # launch時の名前に合わせる
 
 [http_service]
   internal_port = 8501
+  force_https = true
   auto_start_machines = true
-  auto_stop_machines = false
-  min_machines_running = 1
+  auto_stop_machines = false   # ← 自動停止オフ
+  min_machines_running = 1     # ← 常時1台起動
+  processes = ["app"]
 
-# SQLiteを永続化するためのボリューム
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"
+
 [[mounts]]
   source = "data"
   destination = "/data"

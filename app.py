@@ -13,30 +13,30 @@ import altair as alt
 import os, json
 # import streamlit_authenticator as stauth
 
-def _bool(s): return str(s).lower() in ("1","true","yes","on")
+# def _bool(s): return str(s).lower() in ("1","true","yes","on")
 
-def get_secret():
-    if "SP_SHEET_KEY" in os.environ:
-        return {
-            "SP_SHEET_KEY": {"key": os.environ["SP_SHEET_KEY"]},
-            "gcp_service_account": json.loads(os.environ["GCP_SERVICE_ACCOUNT"]),
-            "GEMINI_API": {"api_key": os.environ["GEMINI_API_KEY"]},
-            "IS_PRODUCTION": _bool(os.environ.get("IS_PRODUCTION", "false")),
-        }
-    else:
-        return {
-            "SP_SHEET_KEY": {"key": st.secrets.SP_SHEET_KEY.key},
-            "gcp_service_account": st.secrets["gcp_service_account"],
-            "GEMINI_API": {"api_key": st.secrets.GEMINI_API.api_key},
-            "IS_PRODUCTION": st.secrets.get("IS_PRODUCTION", False),
-        }
+# def get_secret():
+#     if "SP_SHEET_KEY" in os.environ:
+#         return {
+#             "SP_SHEET_KEY": {"key": os.environ["SP_SHEET_KEY"]},
+#             "gcp_service_account": json.loads(os.environ["GCP_SERVICE_ACCOUNT"]),
+#             "GEMINI_API": {"api_key": os.environ["GEMINI_API_KEY"]},
+#             "IS_PRODUCTION": _bool(os.environ.get("IS_PRODUCTION", "false")),
+#         }
+#     else:
+#         return {
+#             "SP_SHEET_KEY": {"key": st.secrets.SP_SHEET_KEY.key},
+#             "gcp_service_account": st.secrets["gcp_service_account"],
+#             "GEMINI_API": {"api_key": st.secrets.GEMINI_API.api_key},
+#             "IS_PRODUCTION": st.secrets.get("IS_PRODUCTION", False),
+#         }
 
-_secrets = get_secret()
-SHEET_KEY = _secrets["SP_SHEET_KEY"]["key"]
-SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-SERVICE_ACCOUNT = _secrets["gcp_service_account"]
-GEMINI_API_KEY = _secrets["GEMINI_API"]["api_key"]
-IS_PRODUCTION = _secrets["IS_PRODUCTION"]
+# _secrets = get_secret()
+# SHEET_KEY = _secrets["SP_SHEET_KEY"]["key"]
+# SPREADSHEET_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+# SERVICE_ACCOUNT = _secrets["gcp_service_account"]
+# GEMINI_API_KEY = _secrets["GEMINI_API"]["api_key"]
+# IS_PRODUCTION = _secrets["IS_PRODUCTION"]
 
 # 1) 実運用DBの場所（ボリューム）
 RUNTIME_DB_DIR = Path("/data")
@@ -52,13 +52,13 @@ if not DB_FILENAME.exists():
         # ここでスキーマ作成処理（CREATE TABLE…）を走らせてもOK
         pass
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-pro-002")
+# genai.configure(api_key=GEMINI_API_KEY)
+# model = genai.GenerativeModel("gemini-1.5-pro-002")
 
-def get_worksheet_from_gspread_client():
-    credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
-    gc = gspread.authorize(credentials)
-    return gc.open_by_key(SHEET_KEY)
+# def get_worksheet_from_gspread_client():
+#     credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT, scopes=SPREADSHEET_SCOPES)
+#     gc = gspread.authorize(credentials)
+#     return gc.open_by_key(SHEET_KEY)
 
 def exists_db_file():
     return DB_FILENAME.exists()
@@ -89,66 +89,66 @@ def load_data(conn, sub_category_id):
         return None
     return df
 
-def initialize_db_from_spreadsheet(conn):
-    st.warning("Spreadsheetから同期中")
-    sh = get_worksheet_from_gspread_client()
-    cursor = conn.cursor()
+# def initialize_db_from_spreadsheet(conn):
+#     st.warning("Spreadsheetから同期中")
+#     sh = get_worksheet_from_gspread_client()
+#     cursor = conn.cursor()
 
-    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-    for table in tables:         
-        try:
-            worksheet = sh.worksheet(table)
-            data = worksheet.get_all_values()
-            df = pd.DataFrame(data[1:], columns=data[0])
-                # Drop the existing table if it exists
-            cursor.execute(f"DROP TABLE IF EXISTS {table}")
+#     tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+#     for table in tables:         
+#         try:
+#             worksheet = sh.worksheet(table)
+#             data = worksheet.get_all_values()
+#             df = pd.DataFrame(data[1:], columns=data[0])
+#                 # Drop the existing table if it exists
+#             cursor.execute(f"DROP TABLE IF EXISTS {table}")
 
-                # Create the table with appropriate column types
-            if table == "main_categories":
-                cursor.execute("""
-                        CREATE TABLE main_categories (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT NOT NULL
-                        );
-                    """)
-            elif table == "sub_categories":
-                cursor.execute("""
-                        CREATE TABLE sub_categories (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            main_category_id INTEGER NOT NULL,
-                            name TEXT NOT NULL,
-                            FOREIGN KEY (main_category_id) REFERENCES main_categories(id)
-                        );
-                    """)
-            elif table == "transactions":
-                cursor.execute("""
-                        CREATE TABLE transactions (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            sub_category_id INTEGER NOT NULL,
-                            amount INTEGER NOT NULL,
-                            type TEXT CHECK(type IN ('支出', '収入', '予算')) NOT NULL,
-                            date TEXT NOT NULL,
-                            detail TEXT,
-                            FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id)
-                        );
-                    """)
-            elif table == "backup_time":
-                cursor.execute("""
-                        CREATE TABLE backup_time (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            time TEXT NOT NULL
-                        );
-                    """)
+#                 # Create the table with appropriate column types
+#             if table == "main_categories":
+#                 cursor.execute("""
+#                         CREATE TABLE main_categories (
+#                             id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                             name TEXT NOT NULL
+#                         );
+#                     """)
+#             elif table == "sub_categories":
+#                 cursor.execute("""
+#                         CREATE TABLE sub_categories (
+#                             id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                             main_category_id INTEGER NOT NULL,
+#                             name TEXT NOT NULL,
+#                             FOREIGN KEY (main_category_id) REFERENCES main_categories(id)
+#                         );
+#                     """)
+#             elif table == "transactions":
+#                 cursor.execute("""
+#                         CREATE TABLE transactions (
+#                             id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                             sub_category_id INTEGER NOT NULL,
+#                             amount INTEGER NOT NULL,
+#                             type TEXT CHECK(type IN ('支出', '収入', '予算')) NOT NULL,
+#                             date TEXT NOT NULL,
+#                             detail TEXT,
+#                             FOREIGN KEY (sub_category_id) REFERENCES sub_categories(id)
+#                         );
+#                     """)
+#             elif table == "backup_time":
+#                 cursor.execute("""
+#                         CREATE TABLE backup_time (
+#                             id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                             time TEXT NOT NULL
+#                         );
+#                     """)
 
-                # Insert the data into the newly created table
-            df.to_sql(table, conn, if_exists="append", index=False)
-            st.success(f"Worksheet {table} から同期されました")
+#                 # Insert the data into the newly created table
+#             df.to_sql(table, conn, if_exists="append", index=False)
+#             st.success(f"Worksheet {table} から同期されました")
 
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"Worksheet {table} not found. Created a new one.")
+#         except gspread.exceptions.WorksheetNotFound:
+#             st.warning(f"Worksheet {table} not found. Created a new one.")
         
-    conn.commit()
-    conn.close()
+#     conn.commit()
+#     conn.close()
 
 def get_budget_and_spent_of_month(conn, month):
     query = f"""
@@ -227,60 +227,60 @@ def update_data(df, changes):
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 
-def backup_data_to_spreadsheet(conn):
-    cursor = conn.cursor()
+# def backup_data_to_spreadsheet(conn):
+#     cursor = conn.cursor()
 
-    cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
-    cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
-    conn.commit()
-    sh = get_worksheet_from_gspread_client()
-    tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
-    for table in tables:
-        cursor.execute(f"SELECT * FROM {table}")
-        data = cursor.fetchall()
-        columns = [description[0] for description in cursor.description]
-        df = pd.DataFrame(data, columns=columns)
+#     cursor.execute("CREATE TABLE IF NOT EXISTS backup_time (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT);")
+#     cursor.execute("INSERT INTO backup_time (time) VALUES (?)", [datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S")])
+#     conn.commit()
+#     sh = get_worksheet_from_gspread_client()
+#     tables = ["main_categories", "sub_categories", "transactions", "backup_time"]
+#     for table in tables:
+#         cursor.execute(f"SELECT * FROM {table}")
+#         data = cursor.fetchall()
+#         columns = [description[0] for description in cursor.description]
+#         df = pd.DataFrame(data, columns=columns)
     
-        try:
-            worksheet = sh.worksheet(table)
-            worksheet.clear()
-        except gspread.exceptions.WorksheetNotFound:
-            worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
-        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
-    conn.close()
+#         try:
+#             worksheet = sh.worksheet(table)
+#             worksheet.clear()
+#         except gspread.exceptions.WorksheetNotFound:
+#             worksheet = sh.add_worksheet(title=table, rows=df.shape[0] + 1, cols=df.shape[1])
+#         worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+#     conn.close()
 
-def analyze_expenses(conn, month):
+# def analyze_expenses(conn, month):
 
-    query = f"""
-            SELECT
-                sub_categories.name as sub_category_name,
-                detail,
-                type
-                date,
-                amount
-            FROM
-                transactions
-            JOIN
-                sub_categories ON transactions.sub_category_id = sub_categories.id
-            JOIN
-                main_categories ON sub_categories.main_category_id = main_categories.id
-            WHERE
-                main_categories.name = '日常' AND
-                transactions.date LIKE '{month}%'
-        """
-    df = pd.read_sql(query, conn)
+#     query = f"""
+#             SELECT
+#                 sub_categories.name as sub_category_name,
+#                 detail,
+#                 type
+#                 date,
+#                 amount
+#             FROM
+#                 transactions
+#             JOIN
+#                 sub_categories ON transactions.sub_category_id = sub_categories.id
+#             JOIN
+#                 main_categories ON sub_categories.main_category_id = main_categories.id
+#             WHERE
+#                 main_categories.name = '日常' AND
+#                 transactions.date LIKE '{month}%'
+#         """
+#     df = pd.read_sql(query, conn)
 
-    if df.empty:
-        return "今月のデータはありません。"
-    category_summary = df.to_string(index=False)
-    prompt = f"今月の{selected_month}の支出の内訳は次のとおりです:\n{category_summary}\nこのデータについて各カテゴリごとに分析をして大河と幸華の共同の思い出を推定して。家計について、できるだけほめるように、かつ親しみ深い口調で、10行以内で答えてください。"
+#     if df.empty:
+#         return "今月のデータはありません。"
+#     category_summary = df.to_string(index=False)
+#     prompt = f"今月の{selected_month}の支出の内訳は次のとおりです:\n{category_summary}\nこのデータについて各カテゴリごとに分析をして大河と幸華の共同の思い出を推定して。家計について、できるだけほめるように、かつ親しみ深い口調で、10行以内で答えてください。"
     
 
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"エラーが発生しました: {e}"
+#     try:
+#         response = model.generate_content(prompt)
+#         return response.text
+#     except Exception as e:
+#         return f"エラーが発生しました: {e}"
 
 def get_monthly_summary():
     """月次の収支サマリーを取得する"""
@@ -308,9 +308,9 @@ def get_monthly_summary():
     return pivot_df
 
 # Main script
-if not exists_db_file():
-    conn = connect_db()
-    initialize_db_from_spreadsheet(conn)
+# if not exists_db_file():
+#     conn = connect_db()
+#     initialize_db_from_spreadsheet(conn)
 
 with st.sidebar:
     if st.secrets.get("IS_PRODUCTION", False):
@@ -340,12 +340,12 @@ with st.sidebar:
         st.progress(percentage / 100)
 
 
-    if st.button("今月の支出を分析"):
+    # if st.button("今月の支出を分析"):
         
-        with st.spinner("分析中..."):
-            conn = connect_db()
-            analysis = analyze_expenses(conn, selected_month)
-            st.write(analysis)
+    #     with st.spinner("分析中..."):
+    #         conn = connect_db()
+    #         analysis = analyze_expenses(conn, selected_month)
+    #         st.write(analysis)
 
     # 贈与見える化機能
     st.title("贈与見える化")
@@ -449,13 +449,13 @@ conn = connect_db()
 backup_time = conn.cursor().execute("SELECT * FROM backup_time ORDER BY time DESC LIMIT 1").fetchone()
 now_date = datetime.strptime(datetime.now(pytz.timezone('Asia/Tokyo')).strftime("%Y/%m/%d %H:%M:%S"), "%Y/%m/%d %H:%M:%S") 
 
-if st.secrets.get("IS_PRODUCTION", False):
-    if (not backup_time) or (now_date - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(minutes=30)):
-        st.warning("バックアップを実行します")
-        backup_data_to_spreadsheet(conn)
-        st.success("バックアップが完了しました")
-else:
-    st.warning("開発環境のため、自動バックアップは実行されません")
+# if st.secrets.get("IS_PRODUCTION", False):
+#     if (not backup_time) or (now_date - datetime.strptime(backup_time[1], "%Y/%m/%d %H:%M:%S") >= timedelta(minutes=30)):
+#         st.warning("バックアップを実行します")
+#         backup_data_to_spreadsheet(conn)
+#         st.success("バックアップが完了しました")
+# else:
+#     st.warning("開発環境のため、自動バックアップは実行されません")
         
 
 conn = connect_db()
@@ -618,14 +618,14 @@ if view_category == "開発者オプション":
             mime="application/octet-stream"
             )
     
-    if st.button("Spreadsheetへ手動でバックアップ"):
-        conn = connect_db()
-        backup_data_to_spreadsheet(conn)
-        st.success("Spreadsheetへバックアップされました")
+    # if st.button("Spreadsheetへ手動でバックアップ"):
+    #     conn = connect_db()
+    #     backup_data_to_spreadsheet(conn)
+    #     st.success("Spreadsheetへバックアップされました")
 
-    if st.button("Spreadsheetから同期"):
-        conn = connect_db()
-        initialize_db_from_spreadsheet(conn)
+    # if st.button("Spreadsheetから同期"):
+    #     conn = connect_db()
+    #     initialize_db_from_spreadsheet(conn)
     
     with st.form("SQLクエリ"):
         query = st.text_area("SQLクエリ", "SELECT * FROM transactions")

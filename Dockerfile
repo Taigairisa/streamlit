@@ -24,5 +24,6 @@ RUN uv sync --frozen || uv sync
 COPY . .
 
 # Streamlit を外から叩けるように
-EXPOSE 8501
-CMD ["uv", "run", "streamlit", "run", "app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+RUN chmod +x /app/start.sh
+CMD ["sh", "/app/start.sh"]
+
