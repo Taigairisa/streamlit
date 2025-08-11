@@ -14,11 +14,11 @@ LINE_PROFILE_URL = "https://api.line.me/v2/profile"
 
 
 # ---------------------------
-# Config
+# Config os.environ.get("AUTH_SALT")
 # ---------------------------
 def _get_line_config() -> Optional[Dict[str, str]]:
-    cid = os.environ.get("LINE_CLIENT_ID")
-    csec = os.environ.get("LINE_CLIENT_SECRET")
+    cid = os.environ.get("LINE_CHANNEL_ID")
+    csec = os.environ.get("LINE_CHANNEL_SECRET")
     redirect = os.environ.get("LINE_REDIRECT_URI")
     if cid and csec and redirect:
         return {"client_id": cid, "client_secret": csec, "redirect_uri": redirect}
