@@ -164,3 +164,42 @@
 
 ---
 この AGENTS.md は「最新の“作業の仕方”」をまとめる場所です。変更がユーザー体験や運用に影響する場合、README と併せて本書も更新してください。
+
+## Flaskアプリケーションへの移行
+
+本プロジェクトは、Streamlitベースの家計簿アプリケーションをFlaskフレームワークに移行しました。これにより、より汎用的なWebアプリケーションとしての利用が可能になります。
+
+### 技術スタックの変更
+- **旧:** Python 3.12 / Streamlit / SQLite
+- **新:** Python 3.12 / Flask / Jinja2 / SQLite / Bootstrap / Custom CSS / JavaScript
+
+### 主要ファイル/ディレクトリの変更
+- `app.py` (Streamlitエントリポイント) から `flask_app.py` (Flaskエントリポイント) へ移行。
+- `kakeibo/pages/` (Streamlitページ) のロジックを `flask_app.py` 内のルーティング関数と `templates/` ディレクトリ内のJinja2テンプレートに再構築。
+- `templates/` ディレクトリを新規作成し、HTMLテンプレートを配置。
+- `static/` ディレクトリを新規作成し、カスタムCSSファイルを配置。
+
+### UI/UXの変更
+- Streamlitの組み込みUIコンポーネントを、HTMLフォーム、Bootstrap、カスタムCSS、JavaScript（動的な要素用）で再実装。
+- Google Fonts (Noto Sans JP) と Material Icons を導入し、UIの視覚的洗練を実施。
+
+### 機能ごとの実装詳細
+- **ホーム (`/`)**: メインカテゴリ選択とサイドバー表示。
+- **追加 (`/add`)**: 取引データの追加フォーム。大カテゴリ連動の小カテゴリ選択。
+- **編集 (`/edit`)**: 取引データの一覧表示、フィルター機能（大カテゴリ、小カテゴリ、日付範囲、ライブフィルター）。個別の取引の編集 (`/edit/<id>`) および削除 (`/delete/<id>`)。
+- **カテゴリー追加・編集 (`/categories`)**: 小カテゴリの追加、既存小カテゴリのリネーム (`/categories/edit/<id>`)、削除 (`/categories/delete/<id>`)。
+- **グラフ (`/graphs`)**: 月次収支と累計資産のグラフ表示。AltairでJSONを生成し、Vega-Lite.jsで描画。
+- **開発者オプション (`/dev`)**: データベースファイルのダウンロード (`/download_db`)、任意のSQL実行機能。
+
+### Docker対応
+- Flaskアプリケーション用の`Dockerfile.flask`および`start-flask.sh`を作成し、Dockerでのビルドと実行を可能に。`makefile`にショートカットを追加。
+
+## ToDoリスト（Flask版）
+
+以下の機能はStreamlit版に存在しますが、Flask版では未実装または簡素化されています。
+- **開発者オプションのバグ:** 現在のflask_app.pyでは開発者オプションにアクセスするとInternalServerErrorになります。
+- **編集ページでの表形式の直接編集機能:** Streamlitの`st.data_editor`のような、表内で直接データの追加・更新・削除を行う機能は実装されていません。個別フォームでの編集・削除となっています。
+- **サイドバーからの未入力月額のインタラクティブな追加:** Streamlit版ではサイドバーから直接、未入力の定期取引の金額入力と追加が可能でしたが、Flask版では一覧表示のみで、追加は「追加」ページで行う必要があります。
+- **認証機能:** Streamlit版に存在するDBログイン、LINEログインなどの認証機能は、Flask版では未実装です。
+- **ログアウトボタンの機能:** ログアウトボタンは設置されていますが、機能は未実装です。
+- **Google Sheets/Gemini連携:** Streamlit版でもコメントアウトされていましたが、Flask版でも未実装です。
