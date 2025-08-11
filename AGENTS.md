@@ -21,6 +21,7 @@
 - Fly.io
   - `fly deploy`（初回は `fly volumes create data --size 1` が必要な場合あり）
 
+
 ## リポジトリマップ（最重要だけ）
 - `app.py`: エントリーポイント（ページ振り分けのみ）。
 - `kakeibo/db.py`: DB 接続・クエリ・更新・月次集計のユーティリティ。
@@ -43,6 +44,7 @@
 - `sub_categories(id, main_category_id, name)`
 - `transactions(id, sub_category_id, amount, type in ['支出','収入','予算'], date 'YYYY-MM-DD', detail)`
 - `backup_time(id, time)`
+- `users(id, username UNIQUE, password 'scheme:value', role, created_at)`
 
 主な関数（`kakeibo/db.py`）
 - `connect_db()` / `exists_db_file()`
@@ -81,7 +83,9 @@
 - 現在リポにシークレット相当ファイルが含まれるため、実運用ではキーのローテーションと外部秘匿を強く推奨。
 - SQL: SQLAlchemy（Core）でパラメータ化済み（`text()` + バインド変数）。
 - データ消失対策: バックアップ機能（Google Sheets）は無効。必要なら再有効化し、検証のうえ段階導入。
- - 認証: `secrets.toml` の `[auth]` で簡易ログインを制御（`enabled`/`users`/`salt`）。本番では `sha256:` 形式利用を推奨。
+ - 認証: DB のみで管理（`secrets.toml` は不使用）。
+   - UI の「新規登録」で `users` に作成。パスワードは `pbkdf2_sha256:<iterations>$<salt_hex>$<hash_hex>` 形式で保存（PBKDF2-HMAC-SHA256, 100k 回）。
+   - ログインは DB の `users` のみを照合。既存の `sha256:`/`plain:` 形式も後方互換で検証可能。
 
 ## テスト/検証（現状）
 - スモークチェック（読み取り中心・破壊なし）
