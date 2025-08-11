@@ -121,81 +121,80 @@ def ensure_authenticated() -> Optional[str]:
 
     _ensure_users_table()
     st.title("認証")
-    tabs = ["LINEでログイン", "ユーザー名でログイン", "新規登録"]
-    tab_line, tab_login, tab_register = st.tabs(tabs)
+
 
     # ---- LINEログイン ----
-    with tab_line:
-        cfg = _get_line_config()
-        if not cfg:
-            st.info("LINEログインは未設定です。環境変数 LINE_CLIENT_ID/SECRET/REDIRECT_URI または secrets.toml の [line] を設定してください。")
-        else:
-            st.caption("LINEアカウントでログインします。初回はLINEの同意画面が表示されます。")
-            profile = line_login_flow()
-            if profile:  # 成功時のみ返る
-                user_id = profile.get("userId")
-                display_name = profile.get("displayName")
-                if user_id:
-                    st.session_state["auth_user"] = f"line:{user_id}"          # ← 重要（URLのcode/stateを消す）
-                    st.success(f"{display_name or 'LINEユーザー'}としてログインしました。")
-                    st.session_state["auth_user"] = f"line:{user_id}"
-                    try:
-                        st.query_params.clear()
-                    except Exception:
-                        st.experimental_set_query_params()
-                    st.rerun()
 
-
-    # ---- ユーザー名/パスワード ----
-    with tab_login:
-        with st.form("login_form", clear_on_submit=False):
-            username = st.text_input("ユーザー名")
-            password = st.text_input("パスワード", type="password")
-            submitted = st.form_submit_button("ログイン")
-        if submitted:
-            stored_db = _db_get_user_password(username)
-            ok = bool(stored_db and _verify_password(stored_db, password, salt=salt))
-            if ok:
-                st.session_state["auth_user"] = username
-                st.query_params.clear()                 # 万一クエリが残っていても掃除
-                st.success("ログインしました。")
+    cfg = _get_line_config()
+    if not cfg:
+        st.info("LINEログインは未設定です。環境変数 LINE_CLIENT_ID/SECRET/REDIRECT_URI または secrets.toml の [line] を設定してください。")
+    else:
+        st.caption("LINEアカウントでログインします。初回はLINEの同意画面が表示されます。")
+        profile = line_login_flow()
+        if profile:  # 成功時のみ返る
+            user_id = profile.get("userId")
+            display_name = profile.get("displayName")
+            if user_id:
+                st.session_state["auth_user"] = f"line:{user_id}"          # ← 重要（URLのcode/stateを消す）
+                st.success(f"{display_name or 'LINEユーザー'}としてログインしました。")
+                st.session_state["auth_user"] = f"line:{user_id}"
+                try:
+                    st.query_params.clear()
+                except Exception:
+                    st.experimental_set_query_params()
                 st.rerun()
-            else:
-                st.error("ユーザー名またはパスワードが正しくありません。")
 
-    # ---- 新規登録 ----
-    with tab_register:
-        st.caption("パスワードは安全な方法でハッシュ化して保存します。")
-        with st.form("register_form", clear_on_submit=False):
-            new_user = st.text_input("ユーザー名（英数字/._- 3〜32文字）")
-            new_pass = st.text_input("パスワード", type="password")
-            new_pass2 = st.text_input("パスワード（確認）", type="password")
-            submitted_reg = st.form_submit_button("登録")
 
-        if submitted_reg:
-            import re
-            if not new_user or not re.fullmatch(r"[A-Za-z0-9._-]{3,32}", new_user):
-                st.error("ユーザー名の形式が正しくありません。"); st.stop()
-            if not new_pass or len(new_pass) < 8:
-                st.error("パスワードは8文字以上で入力してください。"); st.stop()
-            if new_pass != new_pass2:
-                st.error("パスワードが一致しません。"); st.stop()
-            if _db_user_exists(new_user):
-                st.error("このユーザー名は既に登録されています。"); st.stop()
+    # # ---- ユーザー名/パスワード ----
+    # with tab_login:
+    #     with st.form("login_form", clear_on_submit=False):
+    #         username = st.text_input("ユーザー名")
+    #         password = st.text_input("パスワード", type="password")
+    #         submitted = st.form_submit_button("ログイン")
+    #     if submitted:
+    #         stored_db = _db_get_user_password(username)
+    #         ok = bool(stored_db and _verify_password(stored_db, password, salt=salt))
+    #         if ok:
+    #             st.session_state["auth_user"] = username
+    #             st.query_params.clear()                 # 万一クエリが残っていても掃除
+    #             st.success("ログインしました。")
+    #             st.rerun()
+    #         else:
+    #             st.error("ユーザー名またはパスワードが正しくありません。")
 
-            iterations = 100_000
-            salt_bytes = os.urandom(16)
-            dk = hashlib.pbkdf2_hmac("sha256", new_pass.encode("utf-8"), salt_bytes, iterations)
-            stored_fmt = f"pbkdf2_sha256:{iterations}${salt_bytes.hex()}${dk.hex()}"
-            try:
-                _db_create_user(new_user, stored_fmt)
-            except Exception:
-                st.error("登録に失敗しました。別のユーザー名でお試しください。"); st.stop()
+    # # ---- 新規登録 ----
+    # with tab_register:
+    #     st.caption("パスワードは安全な方法でハッシュ化して保存します。")
+    #     with st.form("register_form", clear_on_submit=False):
+    #         new_user = st.text_input("ユーザー名（英数字/._- 3〜32文字）")
+    #         new_pass = st.text_input("パスワード", type="password")
+    #         new_pass2 = st.text_input("パスワード（確認）", type="password")
+    #         submitted_reg = st.form_submit_button("登録")
 
-            st.success("登録が完了しました。ログインします…")
-            st.session_state["auth_user"] = new_user
-            st.query_params.clear()
-            st.rerun()
+    #     if submitted_reg:
+    #         import re
+    #         if not new_user or not re.fullmatch(r"[A-Za-z0-9._-]{3,32}", new_user):
+    #             st.error("ユーザー名の形式が正しくありません。"); st.stop()
+    #         if not new_pass or len(new_pass) < 8:
+    #             st.error("パスワードは8文字以上で入力してください。"); st.stop()
+    #         if new_pass != new_pass2:
+    #             st.error("パスワードが一致しません。"); st.stop()
+    #         if _db_user_exists(new_user):
+    #             st.error("このユーザー名は既に登録されています。"); st.stop()
+
+    #         iterations = 100_000
+    #         salt_bytes = os.urandom(16)
+    #         dk = hashlib.pbkdf2_hmac("sha256", new_pass.encode("utf-8"), salt_bytes, iterations)
+    #         stored_fmt = f"pbkdf2_sha256:{iterations}${salt_bytes.hex()}${dk.hex()}"
+    #         try:
+    #             _db_create_user(new_user, stored_fmt)
+    #         except Exception:
+    #             st.error("登録に失敗しました。別のユーザー名でお試しください。"); st.stop()
+
+    #         st.success("登録が完了しました。ログインします…")
+    #         st.session_state["auth_user"] = new_user
+    #         st.query_params.clear()
+    #         st.rerun()
 
     st.stop()
     return None
