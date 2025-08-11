@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}開発者オプション - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>開発者オプション</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="card mb-4">
+        <div class="card-header">データベース操作</div>
+        <div class="card-body">
+            <p>現在のデータベースファイルをダウンロードします。</p>
+            <a href="{{ url_for('download_db') }}" class="btn btn-primary">kakeibo.dbをダウンロード</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">任意SQL実行</div>
+        <div class="card-body">
+            <p class="text-danger"><strong>警告:</strong> ここで実行するSQLはデータベースに直接影響を与えます。誤ったSQLはデータを破損させる可能性があります。自己責任でご利用ください。</p>
+            <form method="POST" action="{{ url_for('dev_options') }}">
+                <div class="mb-3">
+                    <label for="sqlInput" class="form-label">SQLクエリ</label>
+                    <textarea class="form-control" id="sqlInput" name="sql_query" rows="5" placeholder="例: SELECT * FROM transactions;"></textarea>
+                </div>
+                <button type="submit" class="btn btn-warning">SQLを実行</button>
+            </form>
+
+            {% if sql_result is not none %}
+                <h5 class="mt-4">実行結果:</h5>
+                <pre class="bg-light p-3 rounded">{{ sql_result }}</pre>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

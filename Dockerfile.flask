@@ -1,0 +1,28 @@
+# Use an official Python runtime as a parent image
+FROM python:3.12-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Install uv
+RUN pip install uv
+
+# Copy dependency definitions
+COPY pyproject.toml requirements.txt* ./
+
+# Install dependencies using uv
+RUN uv sync
+
+# Copy the rest of the application code
+COPY . .
+
+# Copy the database if it exists, otherwise the app will create it.
+# This script is from the original Dockerfile and ensures the data volume is populated.
+RUN if [ -f "data/kakeibo.db" ]; then mkdir -p /data && cp data/kakeibo.db /data/kakeibo.db; fi
+
+# Set the data directory environment variable
+ENV KAKEIBO_DATA_DIR=/data
+
+# Make start script executable and run it
+RUN chmod +x /app/start-flask.sh
+CMD ["sh", "/app/start-flask.sh"]

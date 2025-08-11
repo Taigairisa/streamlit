@@ -154,3 +154,86 @@ def get_monthly_summary():
     pivot_df['当月収支'] = pivot_df['収入'] - pivot_df['支出']
     pivot_df['累計資産'] = pivot_df['当月収支'].cumsum()
     return pivot_df
+
+
+def get_transaction_by_id(transaction_id: int):
+    sql = text(
+        """
+        SELECT
+            t.id, t.sub_category_id, t.amount, t.type, t.date, t.detail,
+            sc.main_category_id
+        FROM transactions t
+        JOIN sub_categories sc ON t.sub_category_id = sc.id
+        WHERE t.id = :id
+        """
+    )
+    with ENGINE.connect() as conn:
+        result = conn.execute(sql, {"id": transaction_id}).fetchone()
+    return result
+
+def get_gifts_summary():
+    engine = connect_db()
+    query = text(
+        """
+    SELECT 
+        detail,
+        type,
+        SUM(amount) as total
+    FROM transactions
+    WHERE type IN ('収入', '支出') AND sub_category_id IN (
+        SELECT id FROM sub_categories WHERE name = '贈与'
+    )
+    GROUP BY detail, type;
+    """
+    )
+    with engine.connect() as conn:
+        df = pd.read_sql(query, conn)
+    return df
+
+def get_unentered_recurring_transactions():
+    engine = connect_db()
+    sql = text(
+        """
+        SELECT id, sub_category_id, amount, date, detail, type
+        FROM transactions
+        WHERE sub_category_id IN (
+            SELECT id FROM sub_categories WHERE main_category_id = (
+                SELECT id FROM main_categories WHERE name = '定期'
+            )
+        )
+        AND date = (
+            SELECT MAX(date) FROM transactions t2 WHERE t2.detail = transactions.detail
+        )
+        """
+    )
+    with engine.connect() as conn:
+        recurring_transactions = conn.execute(sql).fetchall()
+    return recurring_transactions
+
+
+def add_sub_category(main_category_id: int, name: str):
+    with ENGINE.begin() as conn:
+        conn.execute(
+            text("INSERT INTO sub_categories (main_category_id, name) VALUES (:mid, :name)"),
+            {"mid": main_category_id, "name": name},
+        )
+
+def rename_sub_category(sub_category_id: int, new_name: str):
+    with ENGINE.begin() as conn:
+        conn.execute(
+            text("UPDATE sub_categories SET name = :new_name WHERE id = :id"),
+            {"new_name": new_name, "id": sub_category_id},
+        )
+
+def delete_sub_category(sub_category_id: int):
+    with ENGINE.begin() as conn:
+        conn.execute(
+            text("DELETE FROM sub_categories WHERE id = :id"),
+            {"id": sub_category_id},
+        )
+
+def get_sub_category_by_id(sub_category_id: int):
+    sql = text("SELECT id, main_category_id, name FROM sub_categories WHERE id = :id")
+    with ENGINE.connect() as conn:
+        result = conn.execute(sql, {"id": sub_category_id}).fetchone()
+    return result

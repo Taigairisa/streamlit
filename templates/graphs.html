@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}グラフ - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>グラフ</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">月次収支</div>
+                <div class="card-body">
+                    <div id="monthly_chart"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">累計資産推移</div>
+                <div class="card-body">
+                    <div id="cumulative_chart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+
+    <script type="text/javascript">
+        const monthlyChartSpec = {{ monthly_chart_json | safe }};
+        const cumulativeChartSpec = {{ cumulative_chart_json | safe }};
+
+        vegaEmbed('#monthly_chart', monthlyChartSpec, { actions: false }).catch(console.error);
+        vegaEmbed('#cumulative_chart', cumulativeChartSpec, { actions: false }).catch(console.error);
+    </script>
+{% endblock %}

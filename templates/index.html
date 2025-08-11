@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}ホーム - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>ダッシュボード</h1>
+{% endblock %}
+
+{% block content %}
+    <p>ようこそ！</p>
+    <div class="mb-3">
+        <label for="mainCategorySelect" class="form-label">カテゴリ</label>
+        <select class="form-select" id="mainCategorySelect" name="main_category">
+            {% for category in main_categories %}
+                <option value="{{ category[0] }}">{{ category[1] }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <p>（ここに各機能が実装されます）</p>
+{% endblock %}

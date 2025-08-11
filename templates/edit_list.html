@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+
+{% block title %}データ編集 - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>データ編集</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="card mb-4">
+        <div class="card-header">フィルター</div>
+        <div class="card-body">
+            <form id="filterForm" method="GET" action="{{ url_for('edit') }}" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="mainCategorySelect" class="form-label">大カテゴリ</label>
+                    <select class="form-select" id="mainCategorySelect" name="main_category_id">
+                        <option value="">すべて</option>
+                        {% for main in main_categories %}
+                            <option value="{{ main[0] }}" {% if main[0] == request.args.get('main_category_id')|int %}selected{% endif %}>{{ main[1] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="subCategorySelect" class="form-label">小カテゴリ</label>
+                    <select class="form-select" id="subCategorySelect" name="sub_category_id">
+                        <option value="">すべて</option>
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="startDate" class="form-label">開始日</label>
+                    <input type="date" class="form-control" id="startDate" name="start_date" value="{{ request.args.get('start_date', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="endDate" class="form-label">終了日</label>
+                    <input type="date" class="form-control" id="endDate" name="end_date" value="{{ request.args.get('end_date', '') }}">
+                </div>
+                
+            </form>
+        </div>
+    </div>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>日付</th>
+                <th>詳細</th>
+                <th>種別</th>
+                <th>金額</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for transaction in transactions %}
+            <tr>
+                <td>{{ transaction.date }}</td>
+                <td>{{ transaction.detail }}</td>
+                <td>{{ transaction.type }}</td>
+                <td>{{ transaction.amount }}</td>
+                <td>
+                    <a href="{{ url_for('edit_transaction', transaction_id=transaction.id) }}" class="btn btn-sm btn-primary">編集</a>
+                    <form action="{{ url_for('delete_transaction', transaction_id=transaction.id) }}" method="POST" style="display:inline;" onsubmit="return confirm('本当に削除しますか？');">
+                        <button type="submit" class="btn btn-sm btn-danger">削除</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="text-center">表示するデータがありません。</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        const mainCategorySelect = document.getElementById('mainCategorySelect');
+        const subCategorySelect = document.getElementById('subCategorySelect');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        const filterForm = document.getElementById('filterForm');
+
+        const allSubCategories = {{ sub_categories | tojson }}; 
+        const selectedSubCategoryId = {{ request.args.get('sub_category_id') | int if request.args.get('sub_category_id') else 'null' }};
+
+        function updateSubCategories() {
+            const selectedMainCategoryId = parseInt(mainCategorySelect.value, 10);
+            subCategorySelect.innerHTML = '<option value="">すべて</option>';
+
+            allSubCategories.forEach(sub => {
+                if (!selectedMainCategoryId || sub[1] === selectedMainCategoryId) {
+                    const option = document.createElement('option');
+                    option.value = sub[0];
+                    option.textContent = sub[2];
+                    if (sub[0] === selectedSubCategoryId) {
+                        option.selected = true;
+                    }
+                    subCategorySelect.appendChild(option);
+                }
+            });
+        }
+
+        function applyFilter() {
+            const params = new URLSearchParams();
+            if (mainCategorySelect.value) {
+                params.append('main_category_id', mainCategorySelect.value);
+            }
+            if (subCategorySelect.value) {
+                params.append('sub_category_id', subCategorySelect.value);
+            }
+            if (startDateInput.value) {
+                params.append('start_date', startDateInput.value);
+            }
+            if (endDateInput.value) {
+                params.append('end_date', endDateInput.value);
+            }
+            window.location.href = "{{ url_for('edit') }}?" + params.toString();
+        }
+
+        mainCategorySelect.addEventListener('change', () => {
+            updateSubCategories(); // Update sub-categories first
+            applyFilter(); // Then apply filter
+        });
+        subCategorySelect.addEventListener('change', applyFilter);
+        startDateInput.addEventListener('change', applyFilter);
+        endDateInput.addEventListener('change', applyFilter);
+
+        document.addEventListener('DOMContentLoaded', updateSubCategories);
+    </script>
+{% endblock %}

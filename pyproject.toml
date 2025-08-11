@@ -30,4 +30,6 @@ dependencies = [
     "toml==0.10.2",
     "uritemplate==4.1.1",
     "urllib3==2.2.2",
+    "Flask==3.0.3",
+    "gunicorn==22.0.0",
 ]

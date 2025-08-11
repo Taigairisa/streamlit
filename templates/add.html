@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}データ追加 - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>データを追加</h1>
+{% endblock %}
+
+{% block content %}
+    <form method="POST" action="{{ url_for('add') }}">
+        <div class="mb-3">
+            <label for="mainCategorySelect" class="form-label">大カテゴリ</label>
+            <select class="form-select" id="mainCategorySelect" name="main_category">
+                {% for category in main_categories %}
+                    <option value="{{ category[0] }}">{{ category[1] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="subCategorySelect" class="form-label">小カテゴリ</label>
+            <select class="form-select" id="subCategorySelect" name="sub_category_id" required>
+                <!-- Options will be populated by JavaScript -->
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="dateInput" class="form-label">日付</label>
+            <input type="date" class="form-control" id="dateInput" name="date" value="{{ today }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="typeSelect" class="form-label">種別</label>
+            <select class="form-select" id="typeSelect" name="type">
+                <option>支出</option>
+                <option>収入</option>
+                <option>予算</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="detailInput" class="form-label">詳細</label>
+            <input type="text" class="form-control" id="detailInput" name="detail">
+        </div>
+
+        <div class="mb-3">
+            <label for="amountInput" class="form-label">金額</label>
+            <input type="number" class="form-control" id="amountInput" name="amount" min="0" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">追加</button>
+    </form>
+
+    <script>
+        const mainCategorySelect = document.getElementById('mainCategorySelect');
+        const subCategorySelect = document.getElementById('subCategorySelect');
+        const subCategories = {{ sub_categories | tojson }};
+
+        function updateSubCategories() {
+            const selectedMainCategoryId = parseInt(mainCategorySelect.value, 10);
+            subCategorySelect.innerHTML = ''; // Clear existing options
+
+            subCategories.forEach(sub => {
+                if (sub[1] === selectedMainCategoryId) {
+                    const option = document.createElement('option');
+                    option.value = sub[0];
+                    option.textContent = sub[2];
+                    subCategorySelect.appendChild(option);
+                }
+            });
+        }
+
+        mainCategorySelect.addEventListener('change', updateSubCategories);
+        // Initial population
+        document.addEventListener('DOMContentLoaded', updateSubCategories);
+    </script>
+{% endblock %}

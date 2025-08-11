@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}取引編集 - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>取引を編集</h1>
+{% endblock %}
+
+{% block content %}
+    <form method="POST" action="{{ url_for('edit_transaction', transaction_id=transaction.id) }}">
+        <div class="mb-3">
+            <label for="mainCategorySelect" class="form-label">大カテゴリ</label>
+            <select class="form-select" id="mainCategorySelect" name="main_category_id">
+                {% for main in main_categories %}
+                    <option value="{{ main[0] }}" {% if main[0] == transaction.main_category_id %}selected{% endif %}>{{ main[1] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="subCategorySelect" class="form-label">小カテゴリ</label>
+            <select class="form-select" id="subCategorySelect" name="sub_category_id" required>
+                <!-- Options will be populated by JavaScript -->
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="dateInput" class="form-label">日付</label>
+            <input type="date" class="form-control" id="dateInput" name="date" value="{{ transaction.date }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="typeSelect" class="form-label">種別</label>
+            <select class="form-select" id="typeSelect" name="type">
+                <option {% if transaction.type == '支出' %}selected{% endif %}>支出</option>
+                <option {% if transaction.type == '収入' %}selected{% endif %}>収入</option>
+                <option {% if transaction.type == '予算' %}selected{% endif %}>予算</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="detailInput" class="form-label">詳細</label>
+            <input type="text" class="form-control" id="detailInput" name="detail" value="{{ transaction.detail }}">
+        </div>
+
+        <div class="mb-3">
+            <label for="amountInput" class="form-label">金額</label>
+            <input type="number" class="form-control" id="amountInput" name="amount" min="0" value="{{ transaction.amount }}" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">更新</button>
+        <a href="{{ url_for('edit') }}" class="btn btn-secondary">キャンセル</a>
+    </form>
+
+    <script>
+        const mainCategorySelect = document.getElementById('mainCategorySelect');
+        const subCategorySelect = document.getElementById('subCategorySelect');
+        const allSubCategories = {{ all_sub_categories | tojson }};
+        const initialSubCategoryId = {{ transaction.sub_category_id }};
+
+        function updateSubCategories() {
+            const selectedMainCategoryId = parseInt(mainCategorySelect.value, 10);
+            subCategorySelect.innerHTML = ''; // Clear existing options
+
+            allSubCategories.forEach(sub => {
+                if (sub[1] === selectedMainCategoryId) {
+                    const option = document.createElement('option');
+                    option.value = sub[0];
+                    option.textContent = sub[2];
+                    if (sub[0] === initialSubCategoryId) {
+                        option.selected = true;
+                    }
+                    subCategorySelect.appendChild(option);
+                }
+            });
+        }
+
+        mainCategorySelect.addEventListener('change', updateSubCategories);
+        document.addEventListener('DOMContentLoaded', updateSubCategories);
+    </script>
+{% endblock %}

@@ -24,3 +24,15 @@ format: fix
 
 typecheck:
 	mypy .
+
+# Flask App Docker Commands
+docker-build-flask:
+	docker build -t kakeibo-flask -f Dockerfile.flask .
+
+docker-run-flask:
+	docker run -d --name kakeibo-flask-app -p 5000:5000 -v /home/taiga/code/kakeibo_st/runtime-data:/data kakeibo-flask
+
+docker-ps:
+	docker ps
+docker-stop-flask:
+	docker stop kakeibo-flask-app && docker rm kakeibo-flask-app 
