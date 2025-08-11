@@ -39,8 +39,9 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
           FLY_APP_NAME: ${{ vars.FLY_APP_NAME }}
           AUTH_ENABLED: ${{ secrets.AUTH_ENABLED }}
-          AUTH_SALT: ${{ secrets.AUTH_SALT }}
-          AUTH_USERS_JSON: ${{ secrets.AUTH_USERS_JSON }}
+          LINE_CHANNEL_ID: ${{ secrets.LINE_CHANNEL_ID }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_REDIRECT_URI: ${{ secrets.LINE_REDIRECT_URI }}
         run: |
           set -e
           APP=${FLY_APP_NAME:-$(awk -F'"' '/^app\s*=/{print $2; exit}' fly.toml)}
@@ -54,12 +55,15 @@ jobs:
           if [ -n "$AUTH_ENABLED" ]; then
             flyctl secrets set AUTH_ENABLED="$AUTH_ENABLED" --app "$APP"
           fi
-          if [ -n "$AUTH_SALT" ]; then
-            flyctl secrets set AUTH_SALT="$AUTH_SALT" --app "$APP"
+          # LINE認証関連
+          if [ -n "$LINE_CHANNEL_ID" ]; then
+            flyctl secrets set LINE_CHANNEL_ID="$LINE_CHANNEL_ID" --app "$APP"
           fi
-          if [ -n "$AUTH_USERS_JSON" ]; then
-            # JSONはクォート崩れしやすいので必ずダブルクォートで包む
-            flyctl secrets set AUTH_USERS_JSON="$AUTH_USERS_JSON" --app "$APP"
+          if [ -n "$LINE_CHANNEL_SECRET" ]; then
+            flyctl secrets set LINE_CHANNEL_SECRET="$LINE_CHANNEL_SECRET" --app "$APP"
+          fi
+          if [ -n "$LINE_REDIRECT_URI" ]; then
+            flyctl secrets set LINE_REDIRECT_URI="$LINE_REDIRECT_URI" --app "$APP"
           fi
 
       - name: Deploy
