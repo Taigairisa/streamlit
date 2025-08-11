@@ -4,7 +4,7 @@
 
 ## プロジェクト概要
 - 目的: 家計簿（支出/収入/予算）を記録し、進捗・推移を可視化する。
-- 技術: Python 3.12 / Streamlit / SQLite。
+- 技術: Python 3.12 / Flask / Jinja2 / SQLite（Streamlit 由来のコードも一部残置）。
 - データ: SQLite DB を `/data/kakeibo.db` に永続化。初回は `data/kakeibo.db` をコピー（Docker）または空スキーマ生成。
 - デプロイ: Docker でコンテナ化、Fly.io で運用（ボリューム `/data`）。
 - 主要画面: 追加、編集、カテゴリー追加・編集、グラフ、開発者オプション。
@@ -23,18 +23,12 @@
 
 
 ## リポジトリマップ（最重要だけ）
-- `app.py`: エントリーポイント（ページ振り分けのみ）。
+- `flask_app.py`: Flask エントリーポイント（ルーティング/テンプレート描画）。
 - `kakeibo/db.py`: DB 接続・クエリ・更新・月次集計のユーティリティ。
-- `kakeibo/views/sidebar.py`: サイドバー（予算進捗/贈与見える化/未入力月額）。
-- `kakeibo/pages/`
-  - `add_page.py`: 追加
-  - `edit_page.py`: 編集
-  - `categories_page.py`: カテゴリー追加・編集
-  - `graphs_page.py`: グラフ
-  - `dev_page.py`: 開発者オプション
+- `templates/`: Jinja2 テンプレート（`base.html`, `index.html`, `add.html`, `edit_list.html`, `graphs.html`, `dev_options.html`）。
+- `static/`: カスタム CSS（Bootstrap/Google Fonts/CDN を併用）。
 - `data/kakeibo.db`: 初期 DB（シード）。
-- `start.sh`: 起動時に `/data/kakeibo.db` を用意→Streamlit 起動。
-- `Dockerfile`: 依存解決は `uv`、ポート 8501 で待受。
+- `start-flask.sh` / `Dockerfile.flask`: Flask 起動用。
 - `fly.toml`: Fly.io 設定（`/data` マウント含む）。
 - `.streamlit/secrets.toml`: Secrets（注意: 機密は本来コミットしない）。
 - `requirements.txt` / `pyproject.toml`: 依存一覧。
@@ -57,16 +51,17 @@
 注意
 - `load_data` は文字列整形で SQL を生成（SQL インジェクション懸念）。改修時はプレースホルダを使う。
 
-## 画面/機能の要点
-- 予算進捗: 「日常」カテゴリについて、当月の支出/予算を比較し進捗バー表示。
-- 贈与見える化: 小カテゴリ「贈与」を対象に、収入（受領）と支出（返礼）を突合。
-- 未入力の月額: 定期カテゴリの直近入力日から1か月経過した項目を入力誘導。
-- グラフ: 2023-10 以降の月次「収入/支出」「累計資産」。
-- 開発者オプション: DB ダウンロード、任意 SQL 実行（バックアップ系はコメントアウト）。
-- Google Sheets/Gemini: コードは存在するが現状コメントアウト（無効）。
+## 画面/機能の要点（Flask 現状）
+- 予算進捗: サイドバーで選択した月のプログレス（URLの`month`を全ページで維持）。
+- 贈与見える化: 「贈与」小カテゴリの収入/支出の対比。
+- 未入力の月額: 定期カテゴリの未入力リマインド。
+- グラフ: 月次収支/累計資産（開始/終了月フィルタ対応）。
+- 編集: スプレッドシート風 UI（Tabulator）。セル編集/行追加/削除、ソート、ライブ検索。変更時は「旧→新」の確認ダイアログ。CDN不可時は簡易表へフォールバック。
+- 開発者オプション: DB ダウンロード（`/download_db`）、任意 SQL 実行（例外表示）。
+- LINE ログイン: `GET /login/line` → `GET /callback/line`（最小実装）。`/logout` でセッションクリア。
 
 ## 開発方針（Design Decisions）
-- 単一ファイル `app.py` に集約（小規模・迅速性優先）。
+- 単一ファイル `flask_app.py` + テンプレートで薄く構成。
 - DB は SQLite を単純利用。外部同期（Google Sheets）は将来機能として温存。
 - 永続化パスは `/data` を正とし、Docker/Fly で扱いやすくする。
 - 変更は局所的・最小限に行い、既存の UI/UX を壊さない。
@@ -78,15 +73,11 @@
 - 例外処理: ユーザーには `st.error`/`st.warning` で分かりやすく通知。
 - 依存: 既存の依存に追加する前に用途を README/本書に記載。
 
-## セキュリティ/運用
-- Secrets: `.streamlit/secrets.toml` に機密を置く想定。公開リポジトリではコミットしないこと。
+- Secrets: `.streamlit/secrets.toml` は旧来の名残。Flask は環境変数（例: `FLASK_SECRET_KEY`）。
 - 現在リポにシークレット相当ファイルが含まれるため、実運用ではキーのローテーションと外部秘匿を強く推奨。
 - SQL: SQLAlchemy（Core）でパラメータ化済み（`text()` + バインド変数）。
 - データ消失対策: バックアップ機能（Google Sheets）は無効。必要なら再有効化し、検証のうえ段階導入。
- - 認証: DB ログインに加えて LINE ログインをサポート。
-   - DB ログイン: 「ユーザー名でログイン/新規登録」。PWは PBKDF2-HMAC-SHA256 (100k) で保存。
-   - LINE ログイン: LINE OAuth 2.0（profile, openid）。成功時は `st.session_state["auth_user"] = "line:<userId>"` を設定。
-   - 設定方法: 環境変数 `LINE_CLIENT_ID`, `LINE_CLIENT_SECRET`, `LINE_REDIRECT_URI` か、`.streamlit/secrets.toml` の `[line]` に `client_id`, `client_secret`, `redirect_uri`。
+ - 認証: LINE OAuth の最小実装あり（`LINE_CLIENT_ID`/`LINE_CLIENT_SECRET`/`LINE_REDIRECT_URI`）。機能ガードは未適用（ToDo）。
 
 ## テスト/検証（現状）
 - スモークチェック（読み取り中心・破壊なし）
@@ -150,17 +141,32 @@
   - 機密・外部キーはダミー化して提示。
 
 ## 環境・設定メモ
-- ポート: 8501
+- ポート: 5000（Flask） / 8501（旧 Streamlit）
 - タイムゾーン: Asia/Tokyo
 - 主要パッケージ: `pandas`, `altair`, `streamlit`, `sqlite3`, ほか
 - 無効化中の機能: Google Sheets 同期、Gemini 分析
 - データディレクトリ: 既定は `/data`。環境変数 `KAKEIBO_DATA_DIR` で上書き可。`/data` に書込不可の場合は自動でリポジトリ内 `./runtime-data` にフォールバック（CI/サンドボックス向け）。
 
-## 将来の改善候補（軽めのロードマップ）
-- SQL パラメータ化と簡易 DAO 化。
-- `app.py` の軽い分割（`db.py`, `views/*.py` など）。
-- 最低限の e2e/スモークテスト整備（起動/主要 UI）。
-- バックアップ/リストアの UI 連携（Sheets or ファイル）。
+## 将来の改善候補（Flask/UX ToDo）
+- 認証ガード: `/edit` `/dev` `/api/*` にログイン必須（Blueprint + before_request）。
+- CSRF: 変更系 API にトークン導入（ヘッダ or Flask-WTF）。
+- Tabulator のローカル配信（static/vendor）とアセットバンドル。
+- 編集UX: 複数行一括編集/バルク保存、ショートカット、列固定、CSV/TSV入出力。
+- `/api/transactions` サーバーサイドページング/ソート、簡易キャッシュ。
+- 監査ログ: 誰が何をいつ変更したかの記録。
+- 404/500 テンプレートと構造化ロギング。
+
+---
+### Flask 実装の起動（ローカル）
+- 依存インストール: `uv sync` または `pip install -r requirements.txt`
+- 起動: `uv run python flask_app.py`（`http://localhost:5000`）
+- Docker: `docker build -f Dockerfile.flask -t kakeibo-flask .` → `docker run --rm -p 5000:5000 -v $(pwd)/runtime-data:/data kakeibo-flask`
+
+### API（編集用・JSON）
+- GET `/api/transactions`（クエリ: `main_category_id`, `sub_category_id`, `start_date`, `end_date`）
+- POST `/api/transactions`（新規作成）
+- PATCH `/api/transactions/<id>`（部分更新）
+- DELETE `/api/transactions/<id>`（削除）
 
 ---
 この AGENTS.md は「最新の“作業の仕方”」をまとめる場所です。変更がユーザー体験や運用に影響する場合、README と併せて本書も更新してください。
