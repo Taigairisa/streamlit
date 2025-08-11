@@ -153,6 +153,14 @@ def get_monthly_summary():
             pivot_df[col] = 0
     pivot_df['当月収支'] = pivot_df['収入'] - pivot_df['支出']
     pivot_df['累計資産'] = pivot_df['当月収支'].cumsum()
+    # Altair expects fields as columns, not index. Also use a real datetime for temporal axis.
+    pivot_df = pivot_df.reset_index()
+    if not pivot_df.empty:
+        try:
+            pivot_df['month'] = pd.to_datetime(pivot_df['month'].astype(str) + '-01', format='%Y-%m-%d')
+        except Exception:
+            # Fallback: let pandas infer
+            pivot_df['month'] = pd.to_datetime(pivot_df['month'], errors='coerce')
     return pivot_df
 
 

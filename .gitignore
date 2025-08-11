@@ -33,3 +33,6 @@ service_account.json
 
 # Local scratch
 test.py
+
+# Node / frontend deps
+node_modules/

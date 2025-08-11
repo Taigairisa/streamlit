@@ -7,6 +7,30 @@
 {% endblock %}
 
 {% block content %}
+    <div class="card mb-3">
+        <div class="card-header">期間フィルター</div>
+        <div class="card-body">
+            <form id="rangeForm" method="GET" action="{{ url_for('graphs') }}" class="row g-3 align-items-end">
+                <input type="hidden" name="month" value="{{ selected_month }}" />
+                <div class="col-md-3">
+                    <label for="startMonth" class="form-label">開始月</label>
+                    <select id="startMonth" name="start_month" class="form-select">
+                        {% for m in month_options %}
+                            <option value="{{ m }}" {% if m == selected_start_month %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="endMonth" class="form-label">終了月</label>
+                    <select id="endMonth" name="end_month" class="form-select">
+                        {% for m in month_options %}
+                            <option value="{{ m }}" {% if m == selected_end_month %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
     <div class="row">
         <div class="col-md-6">
             <div class="card mb-4">
@@ -36,5 +60,17 @@
 
         vegaEmbed('#monthly_chart', monthlyChartSpec, { actions: false }).catch(console.error);
         vegaEmbed('#cumulative_chart', cumulativeChartSpec, { actions: false }).catch(console.error);
+
+        // Auto-submit on change
+        document.addEventListener('DOMContentLoaded', function () {
+            const form = document.getElementById('rangeForm');
+            const startSel = document.getElementById('startMonth');
+            const endSel = document.getElementById('endMonth');
+            if (form && startSel && endSel) {
+                const submit = () => form.submit();
+                startSel.addEventListener('change', submit);
+                endSel.addEventListener('change', submit);
+            }
+        });
     </script>
 {% endblock %}
