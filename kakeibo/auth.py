@@ -1,79 +1,15 @@
 import hmac
 import hashlib
-import json
 import os
-from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
 import streamlit as st
-
-
-def _env_bool(val: Optional[str]) -> Optional[bool]:
-    if val is None:
-        return None
-    return str(val).strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _load_from_env() -> Optional[Dict]:
-    """Optional env fallback.
-
-    AUTH_ENABLED=true|false
-    AUTH_SALT=...
-    AUTH_USERS_JSON='{"user":"plain:pass", "admin":"sha256:..."}'
-    """
-    enabled = _env_bool(os.environ.get("AUTH_ENABLED"))
-    users_json = os.environ.get("AUTH_USERS_JSON")
-    salt = os.environ.get("AUTH_SALT")
-    if enabled is None and users_json is None and salt is None:
-        return None
-    users: Dict[str, str] = {}
-    if users_json:
-        try:
-            data = json.loads(users_json)
-            if isinstance(data, dict):
-                users = {str(k): str(v) for k, v in data.items()}
-        except Exception:
-            pass
-    return {"enabled": bool(enabled), "salt": salt or "", "users": users}
-
-
-def _secrets_file_exists() -> bool:
-    # Avoid touching st.secrets if there is no file to prevent noisy warnings
-    paths = [
-        Path("/app/.streamlit/secrets.toml"),
-        Path.home() / ".streamlit" / "secrets.toml",
-    ]
-    return any(p.exists() for p in paths)
-
-
-def _get_auth_config() -> Dict:
-    """Load auth config from env or Streamlit secrets if present.
-
-    Expected structure in .streamlit/secrets.toml:
-
-    [auth]
-    enabled = true
-    salt = "change-me"
-    [auth.users]
-    admin = "sha256:<hex>"
-    viewer = "plain:password"
-    """
-    env_cfg = _load_from_env()
-    if env_cfg is not None:
-        return env_cfg
-    if _secrets_file_exists():
-        # Accessing st.secrets only when we know a file exists avoids warnings
-        return st.secrets.get("auth", {})
-    return {}
+from sqlalchemy import text
+from kakeibo.db import connect_db
+from .line_auth import line_login_flow, _get_line_config
 
 
 def _verify_password(stored: str, provided: str, salt: str = "") -> bool:
-    """Verify provided password against stored value.
-
-    Supported formats:
-    - plain:<password>
-    - sha256:<hex-digest>  (computed as sha256(salt + provided))
-    """
     if not isinstance(stored, str):
         return False
     if stored.startswith("plain:"):
@@ -81,51 +17,184 @@ def _verify_password(stored: str, provided: str, salt: str = "") -> bool:
         return hmac.compare_digest(expected, provided)
     if stored.startswith("sha256:"):
         expected_hex = stored.split(":", 1)[1]
-        digest = hashlib.sha256((salt + provided).encode("utf-8")).hexdigest()
+        base = (salt + provided) if salt else provided
+        digest = hashlib.sha256(base.encode("utf-8")).hexdigest()
         return hmac.compare_digest(expected_hex, digest)
-    # Unsupported scheme
+    if stored.startswith("pbkdf2_sha256:"):
+        try:
+            _, rest = stored.split(":", 1)
+            iters_s, salt_hex, hash_hex = rest.split("$")
+            iterations = int(iters_s)
+            salt_bytes = bytes.fromhex(salt_hex)
+            expected = bytes.fromhex(hash_hex)
+            dk = hashlib.pbkdf2_hmac("sha256", provided.encode("utf-8"), salt_bytes, iterations)
+            return hmac.compare_digest(expected, dk)
+        except Exception:
+            return False
     return False
 
 
+def _ensure_users_table():
+    engine = connect_db()
+    sql = text("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'user',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    with engine.begin() as conn:
+        conn.execute(sql)
+
+
+def _db_get_user_password(username: str) -> Optional[str]:
+    engine = connect_db()
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT password FROM users WHERE username = :u"), {"u": username}).fetchone()
+    return row[0] if row else None
+
+
+def _db_user_exists(username: str) -> bool:
+    engine = connect_db()
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT 1 FROM users WHERE username = :u"), {"u": username}).fetchone()
+    return bool(row)
+
+
+def _db_create_user(username: str, stored_password: str) -> None:
+    engine = connect_db()
+    with engine.begin() as conn:
+        conn.execute(
+            text("INSERT INTO users (username, password) VALUES (:u, :p)"),
+            {"u": username, "p": stored_password},
+        )
+
+
+def _db_has_any_user() -> bool:
+    engine = connect_db()
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT 1 FROM users LIMIT 1")).fetchone()
+    return bool(row)
+
+def _do_logout():
+    # 1) URLクエリを確実に消す
+    try:
+        st.query_params.clear()
+    except Exception:
+        # 古いStreamlit互換
+        st.experimental_set_query_params()
+
+    # 2) セッションをまるごと初期化（auth関連含む）
+    for k in list(st.session_state.keys()):
+        del st.session_state[k]
+    # 3) 念のためのフラグ（メッセージ出すなら使える）
+    st.session_state["just_logged_out"] = True
+
+
 def ensure_authenticated() -> Optional[str]:
-    """Gate the app until a valid login. Returns the username or None if blocked.
-
-    If auth.enabled is false or missing, no gating is applied (returns "anonymous").
     """
-    cfg = _get_auth_config()
-    enabled = bool(cfg.get("enabled"))
-    users: Dict[str, str] = cfg.get("users", {}) or {}
-    salt = str(cfg.get("salt", ""))
+    ログイン済みユーザー名を返す。未ログインならUIでブロック。
+    LINEログイン（DB-backed state）＋ 従来のユーザー名/パスワードの併用。
+    """
+    salt = ""
 
-    # If disabled or no users configured, do not block usage
-    if not enabled or not users:
-        return "anonymous"
+    # すでにログイン済みなら、クエリ(code/state)が付いていても掃除しておく
+    if st.session_state.get("auth_user"):
+        if "code" in st.query_params or "state" in st.query_params:
+            try:
+                st.query_params.clear()
+            except Exception:
+                st.experimental_set_query_params()
+            st.rerun()
 
-    # Logout control in sidebar
+
+    # ログアウトボタン（必ずクエリを掃除）
     if st.session_state.get("auth_user"):
         with st.sidebar:
-            if st.button("ログアウト"):
-                st.session_state.pop("auth_user", None)
-                st.rerun()
+            if st.session_state.get("auth_user"):
+                st.button("ログアウト", key="logout_btn", on_click=_do_logout)  # ← これがミソ     # ← これだけ
 
     if st.session_state.get("auth_user"):
         return st.session_state["auth_user"]
 
-    st.title("ログイン")
-    with st.form("login_form", clear_on_submit=False):
-        username = st.text_input("ユーザー名")
-        password = st.text_input("パスワード", type="password")
-        submitted = st.form_submit_button("ログイン")
+    _ensure_users_table()
+    st.title("認証")
 
-    if submitted:
-        stored = users.get(username)
-        if stored and _verify_password(stored, password, salt=salt):
-            st.session_state["auth_user"] = username
-            st.success("ログインしました。")
-            st.rerun()
-        else:
-            st.error("ユーザー名またはパスワードが正しくありません。")
 
-    # Block the rest of the page
+    # ---- LINEログイン ----
+
+    cfg = _get_line_config()
+    if not cfg:
+        st.info("LINEログインは未設定です。環境変数 LINE_CLIENT_ID/SECRET/REDIRECT_URI または secrets.toml の [line] を設定してください。")
+    else:
+        st.caption("LINEアカウントでログインします。初回はLINEの同意画面が表示されます。")
+        profile = line_login_flow()
+        if profile:  # 成功時のみ返る
+            user_id = profile.get("userId")
+            display_name = profile.get("displayName")
+            if user_id:
+                st.session_state["auth_user"] = f"line:{user_id}"          # ← 重要（URLのcode/stateを消す）
+                st.success(f"{display_name or 'LINEユーザー'}としてログインしました。")
+                st.session_state["auth_user"] = f"line:{user_id}"
+                try:
+                    st.query_params.clear()
+                except Exception:
+                    st.experimental_set_query_params()
+                st.rerun()
+
+
+    # # ---- ユーザー名/パスワード ----
+    # with tab_login:
+    #     with st.form("login_form", clear_on_submit=False):
+    #         username = st.text_input("ユーザー名")
+    #         password = st.text_input("パスワード", type="password")
+    #         submitted = st.form_submit_button("ログイン")
+    #     if submitted:
+    #         stored_db = _db_get_user_password(username)
+    #         ok = bool(stored_db and _verify_password(stored_db, password, salt=salt))
+    #         if ok:
+    #             st.session_state["auth_user"] = username
+    #             st.query_params.clear()                 # 万一クエリが残っていても掃除
+    #             st.success("ログインしました。")
+    #             st.rerun()
+    #         else:
+    #             st.error("ユーザー名またはパスワードが正しくありません。")
+
+    # # ---- 新規登録 ----
+    # with tab_register:
+    #     st.caption("パスワードは安全な方法でハッシュ化して保存します。")
+    #     with st.form("register_form", clear_on_submit=False):
+    #         new_user = st.text_input("ユーザー名（英数字/._- 3〜32文字）")
+    #         new_pass = st.text_input("パスワード", type="password")
+    #         new_pass2 = st.text_input("パスワード（確認）", type="password")
+    #         submitted_reg = st.form_submit_button("登録")
+
+    #     if submitted_reg:
+    #         import re
+    #         if not new_user or not re.fullmatch(r"[A-Za-z0-9._-]{3,32}", new_user):
+    #             st.error("ユーザー名の形式が正しくありません。"); st.stop()
+    #         if not new_pass or len(new_pass) < 8:
+    #             st.error("パスワードは8文字以上で入力してください。"); st.stop()
+    #         if new_pass != new_pass2:
+    #             st.error("パスワードが一致しません。"); st.stop()
+    #         if _db_user_exists(new_user):
+    #             st.error("このユーザー名は既に登録されています。"); st.stop()
+
+    #         iterations = 100_000
+    #         salt_bytes = os.urandom(16)
+    #         dk = hashlib.pbkdf2_hmac("sha256", new_pass.encode("utf-8"), salt_bytes, iterations)
+    #         stored_fmt = f"pbkdf2_sha256:{iterations}${salt_bytes.hex()}${dk.hex()}"
+    #         try:
+    #             _db_create_user(new_user, stored_fmt)
+    #         except Exception:
+    #             st.error("登録に失敗しました。別のユーザー名でお試しください。"); st.stop()
+
+    #         st.success("登録が完了しました。ログインします…")
+    #         st.session_state["auth_user"] = new_user
+    #         st.query_params.clear()
+    #         st.rerun()
+
     st.stop()
     return None

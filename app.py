@@ -11,6 +11,7 @@ def main():
     _user = ensure_authenticated()
 
     view_category = render_sidebar()
+    st.write("DEBUG view_category =", repr(view_category))  # ← 一時確認
 
     engine = connect_db()
     main_categories, sub_categories = get_categories(engine)

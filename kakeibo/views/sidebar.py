@@ -9,9 +9,25 @@ from kakeibo.db import connect_db, get_budget_and_spent_of_month
 
 
 def render_sidebar():
-    view_category = st.sidebar.selectbox(
+    # 初期化
+    options = ["追加", "編集", "カテゴリー追加・編集", "グラフ", "開発者オプション"]
+
+    if "page_change_select" not in st.session_state:
+        st.session_state.page_change_select = options[0]
+        st.write("page_change_select")
+    if "view_category" not in st.session_state:
+        st.session_state.view_category = options[0]
+        st.write("view_category")
+    
+    def on_page_change():
+        st.session_state.view_category = st.session_state.page_change_select
+
+    st.sidebar.selectbox(
         label="ページ変更",
-        options=["追加", "編集", "カテゴリー追加・編集", "グラフ", "開発者オプション"],
+        options=options,
+        index=options.index(st.session_state.page_change_select),
+        key="page_change_select",
+        on_change=on_page_change
     )
 
     # 予算進捗
@@ -128,4 +144,4 @@ def render_sidebar():
         except Exception as e:
             st.sidebar.error(f"An error occurred: {str(e)}")
 
-    return view_category
+    return st.session_state.view_category

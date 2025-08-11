@@ -21,6 +21,7 @@
 - Fly.io
   - `fly deploy`（初回は `fly volumes create data --size 1` が必要な場合あり）
 
+
 ## リポジトリマップ（最重要だけ）
 - `app.py`: エントリーポイント（ページ振り分けのみ）。
 - `kakeibo/db.py`: DB 接続・クエリ・更新・月次集計のユーティリティ。
@@ -43,6 +44,7 @@
 - `sub_categories(id, main_category_id, name)`
 - `transactions(id, sub_category_id, amount, type in ['支出','収入','予算'], date 'YYYY-MM-DD', detail)`
 - `backup_time(id, time)`
+- `users(id, username UNIQUE, password 'scheme:value', role, created_at)`
 
 主な関数（`kakeibo/db.py`）
 - `connect_db()` / `exists_db_file()`
@@ -81,7 +83,10 @@
 - 現在リポにシークレット相当ファイルが含まれるため、実運用ではキーのローテーションと外部秘匿を強く推奨。
 - SQL: SQLAlchemy（Core）でパラメータ化済み（`text()` + バインド変数）。
 - データ消失対策: バックアップ機能（Google Sheets）は無効。必要なら再有効化し、検証のうえ段階導入。
- - 認証: `secrets.toml` の `[auth]` で簡易ログインを制御（`enabled`/`users`/`salt`）。本番では `sha256:` 形式利用を推奨。
+ - 認証: DB ログインに加えて LINE ログインをサポート。
+   - DB ログイン: 「ユーザー名でログイン/新規登録」。PWは PBKDF2-HMAC-SHA256 (100k) で保存。
+   - LINE ログイン: LINE OAuth 2.0（profile, openid）。成功時は `st.session_state["auth_user"] = "line:<userId>"` を設定。
+   - 設定方法: 環境変数 `LINE_CLIENT_ID`, `LINE_CLIENT_SECRET`, `LINE_REDIRECT_URI` か、`.streamlit/secrets.toml` の `[line]` に `client_id`, `client_secret`, `redirect_uri`。
 
 ## テスト/検証（現状）
 - スモークチェック（読み取り中心・破壊なし）
