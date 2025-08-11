@@ -17,7 +17,6 @@ Thumbs.db
 # Environment / secrets
 .env
 .env.*
-.streamlit/secrets.toml
 service_account.json
 
 # Not needed for runtime image

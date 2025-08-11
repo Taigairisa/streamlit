@@ -83,9 +83,10 @@
 - 現在リポにシークレット相当ファイルが含まれるため、実運用ではキーのローテーションと外部秘匿を強く推奨。
 - SQL: SQLAlchemy（Core）でパラメータ化済み（`text()` + バインド変数）。
 - データ消失対策: バックアップ機能（Google Sheets）は無効。必要なら再有効化し、検証のうえ段階導入。
- - 認証: DB のみで管理（`secrets.toml` は不使用）。
-   - UI の「新規登録」で `users` に作成。パスワードは `pbkdf2_sha256:<iterations>$<salt_hex>$<hash_hex>` 形式で保存（PBKDF2-HMAC-SHA256, 100k 回）。
-   - ログインは DB の `users` のみを照合。既存の `sha256:`/`plain:` 形式も後方互換で検証可能。
+ - 認証: DB ログインに加えて LINE ログインをサポート。
+   - DB ログイン: 「ユーザー名でログイン/新規登録」。PWは PBKDF2-HMAC-SHA256 (100k) で保存。
+   - LINE ログイン: LINE OAuth 2.0（profile, openid）。成功時は `st.session_state["auth_user"] = "line:<userId>"` を設定。
+   - 設定方法: 環境変数 `LINE_CLIENT_ID`, `LINE_CLIENT_SECRET`, `LINE_REDIRECT_URI` か、`.streamlit/secrets.toml` の `[line]` に `client_id`, `client_secret`, `redirect_uri`。
 
 ## テスト/検証（現状）
 - スモークチェック（読み取り中心・破壊なし）
