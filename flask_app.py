@@ -5,18 +5,51 @@ import requests
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from datetime import date
 from sqlalchemy import text
-from kakeibo.db import connect_db, get_categories, get_transaction_by_id, add_sub_category, rename_sub_category, delete_sub_category, get_sub_category_by_id, get_monthly_summary, DB_FILENAME, get_gifts_summary, get_unentered_recurring_transactions, get_budget_and_spent_of_month
-import altair as alt
+from kakeibo.db import (
+    connect_db,
+    get_categories,
+    get_transaction_by_id,
+    add_sub_category,
+    rename_sub_category,
+    delete_sub_category,
+    get_sub_category_by_id,
+    get_monthly_summary,
+    DB_FILENAME,
+    get_gifts_summary,
+    get_unentered_recurring_transactions,
+    get_budget_and_spent_of_month,
+    ensure_aikotoba_schema,
+    get_aikotoba_id,
+)
 import json
 from flask import send_file
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import pytz
-import pandas as pd
+# Note: Heavy libs (pandas, altair) are imported lazily in routes that need them
 
 app = Flask(__name__)
 # Minimal secret key for session (override via env in production)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret')
+
+# Ensure aikotoba schema at startup
+try:
+    ensure_aikotoba_schema()
+except Exception:
+    pass
+
+def _get_current_user_aikotoba_id() -> int:
+    engine = connect_db()
+    public_id = get_aikotoba_id("public")
+    username = session.get('auth_user')
+    if not username:
+        return public_id
+    try:
+        with engine.connect() as conn:
+            aid = conn.execute(text("SELECT aikotoba_id FROM users WHERE username = :u"), {"u": username}).scalar()
+            return aid if aid is not None else public_id
+    except Exception:
+        return public_id
 
 def _is_api_request() -> bool:
     try:
@@ -59,7 +92,8 @@ def get_sidebar_data(selected_month=None):
         selected_month = months[0]
 
     # Budget progress
-    spent, budget, _ = get_budget_and_spent_of_month(selected_month)
+    aid = _get_current_user_aikotoba_id()
+    spent, budget, _ = get_budget_and_spent_of_month(selected_month, aid)
     budget_progress = []
     for category in budget.index:
         spent_amount = spent.get(category, 0)
@@ -74,7 +108,7 @@ def get_sidebar_data(selected_month=None):
         })
 
     # Gift visualization
-    gifts_df = get_gifts_summary()
+    gifts_df = get_gifts_summary(aid)
     gift_summary = []
     if not gifts_df.empty:
         gifts = gifts_df[gifts_df['type'] == '収入'].set_index('detail')['total']
@@ -92,7 +126,7 @@ def get_sidebar_data(selected_month=None):
             })
 
     # Unentered monthly amounts
-    recurring_transactions = get_unentered_recurring_transactions()
+    recurring_transactions = get_unentered_recurring_transactions(aid)
     unentered_amounts = []
     today = date.today()
     for transaction in recurring_transactions:
@@ -121,7 +155,8 @@ def index():
 @app.route('/add', methods=['GET', 'POST'])
 def add():
     engine = connect_db()
-    main_categories, sub_categories = get_categories(engine)
+    aid = _get_current_user_aikotoba_id()
+    main_categories, sub_categories = get_categories(engine, aikotoba_id=aid)
 
     if request.method == 'POST':
         sub_category_id = request.form['sub_category_id']
@@ -131,11 +166,15 @@ def add():
         amount = request.form['amount']
 
         with engine.begin() as conn:
+            # derive aikotoba from sub_category
+            sub_aid = conn.execute(text("SELECT aikotoba_id FROM sub_categories WHERE id = :sid"), {"sid": sub_category_id}).scalar()
+            if sub_aid is None:
+                sub_aid = _get_current_user_aikotoba_id()
             conn.execute(
                 text(
                     """
-                    INSERT INTO transactions (sub_category_id, amount, type, date, detail)
-                    VALUES (:sid, :amount, :type, :date, :detail)
+                    INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id)
+                    VALUES (:sid, :amount, :type, :date, :detail, :aid)
                     """
                 ),
                 {
@@ -144,6 +183,7 @@ def add():
                     "type": transaction_type,
                     "date": transaction_date,
                     "detail": detail,
+                    "aid": sub_aid,
                 },
             )
         return redirect(url_for('index'))
@@ -161,12 +201,13 @@ def login():
     # Show login page; if already logged in, go to index
     if session.get('auth_user'):
         return redirect(url_for('index'))
-    return render_template('login.html', **get_sidebar_data(selected_month=request.args.get('month')))
+    return render_template('login.html')
 
 @app.route('/edit')
 def edit():
     engine = connect_db()
-    main_categories, sub_categories = get_categories(engine)
+    aid = _get_current_user_aikotoba_id()
+    main_categories, sub_categories = get_categories(engine, aikotoba_id=aid)
 
     # Get filter criteria from query parameters
     main_category_id = request.args.get('main_category_id')
@@ -241,8 +282,10 @@ def api_get_transactions():
     if end_date:
         query += " AND t.date <= :end_date"
         params['end_date'] = end_date
-    query += " ORDER BY t.date DESC, t.id DESC"
+    aid = _get_current_user_aikotoba_id()
+    query += " AND t.aikotoba_id = :aid ORDER BY t.date DESC, t.id DESC"
 
+    params['aid'] = aid
     with engine.connect() as conn:
         rows = conn.execute(text(query), params).mappings().all()
         data = [dict(r) for r in rows]
@@ -257,11 +300,15 @@ def api_create_transaction():
     if not all(k in payload and payload[k] not in (None, '') for k in required):
         return jsonify({"error": "Missing required fields"}), 400
     with engine.begin() as conn:
+        # derive aikotoba_id from sub_category; fallback to user's
+        sub_aid = conn.execute(text("SELECT aikotoba_id FROM sub_categories WHERE id = :sid"), {"sid": payload['sub_category_id']}).scalar()
+        if sub_aid is None:
+            sub_aid = _get_current_user_aikotoba_id()
         result = conn.execute(
             text(
                 """
-                INSERT INTO transactions (sub_category_id, amount, type, date, detail)
-                VALUES (:sid, :amount, :type, :date, :detail)
+                INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id)
+                VALUES (:sid, :amount, :type, :date, :detail, :aid)
                 """
             ),
             {
@@ -270,6 +317,7 @@ def api_create_transaction():
                 "type": payload['type'],
                 "date": payload['date'],
                 "detail": payload.get('detail', ''),
+                "aid": sub_aid,
             },
         )
         new_id = result.lastrowid
@@ -286,8 +334,9 @@ def api_update_transaction(transaction_id: int):
         return jsonify({"error": "No fields to update"}), 400
     set_clause = ", ".join([f"{k} = :{k}" for k in fields.keys()])
     fields['id'] = transaction_id
+    fields['aid'] = _get_current_user_aikotoba_id()
     with engine.begin() as conn:
-        res = conn.execute(text(f"UPDATE transactions SET {set_clause} WHERE id = :id"), fields)
+        res = conn.execute(text(f"UPDATE transactions SET {set_clause} WHERE id = :id AND aikotoba_id = :aid"), fields)
     return jsonify({"updated": res.rowcount})
 
 
@@ -295,7 +344,7 @@ def api_update_transaction(transaction_id: int):
 def api_delete_transaction(transaction_id: int):
     engine = connect_db()
     with engine.begin() as conn:
-        res = conn.execute(text("DELETE FROM transactions WHERE id = :id"), {"id": transaction_id})
+        res = conn.execute(text("DELETE FROM transactions WHERE id = :id AND aikotoba_id = :aid"), {"id": transaction_id, "aid": _get_current_user_aikotoba_id()})
     return jsonify({"deleted": res.rowcount})
 
 @app.route('/dev', methods=['GET', 'POST'])
@@ -349,6 +398,46 @@ def logout():
     ]:
         session.pop(key, None)
     return redirect(url_for('index'))
+
+
+# ===============
+# Aikotoba (passcode) settings
+# ===============
+
+@app.route('/aikotoba', methods=['GET'])
+def aikotoba_settings():
+    engine = connect_db()
+    aid = _get_current_user_aikotoba_id()
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT code, label FROM aikotoba WHERE id = :id"), {"id": aid}).fetchone()
+    current = {"code": row[0], "label": row[1]} if row else {"code": "public", "label": "公開"}
+    return render_template('aikotoba.html', current=current, **get_sidebar_data(selected_month=request.args.get('month')))
+
+
+@app.post('/aikotoba/join')
+def join_aikotoba():
+    code = request.form.get('code', '').strip()
+    if not code:
+        return redirect(url_for('aikotoba_settings'))
+    engine = connect_db()
+    username = session.get('auth_user')
+    with engine.begin() as conn:
+        aid = conn.execute(text("SELECT id FROM aikotoba WHERE code = :c AND active = 1"), {"c": code}).scalar()
+        if not aid:
+            session['aikotoba_error'] = '合言葉が見つかりません。'
+            return redirect(url_for('aikotoba_settings'))
+        conn.execute(text("UPDATE users SET aikotoba_id = :aid WHERE username = :u"), {"aid": aid, "u": username})
+    return redirect(url_for('aikotoba_settings'))
+
+
+@app.post('/aikotoba/leave')
+def leave_aikotoba():
+    engine = connect_db()
+    username = session.get('auth_user')
+    public_id = get_aikotoba_id("public")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE users SET aikotoba_id = :aid WHERE username = :u"), {"aid": public_id, "u": username})
+    return redirect(url_for('aikotoba_settings'))
 
 
 # ===============
@@ -516,7 +605,10 @@ def callback_line():
     _ensure_users_table()
     username = f"line:{user_id}"
     if not _user_exists(username):
-        _create_user(username)
+        public_id = get_aikotoba_id("public")
+        engine = connect_db()
+        with engine.begin() as conn:
+            conn.execute(text("INSERT INTO users (username, password, aikotoba_id) VALUES (:u, :p, :aid)"), {"u": username, "p": "external", "aid": public_id})
     session['auth_user'] = username
     # Redirect back to the original page if available
     next_url = session.pop('post_login_redirect', None)
@@ -532,7 +624,8 @@ def edit_transaction(transaction_id):
     if not transaction:
         return "Transaction not found", 404
 
-    main_categories, all_sub_categories = get_categories(engine)
+    aid = _get_current_user_aikotoba_id()
+    main_categories, all_sub_categories = get_categories(engine, aikotoba_id=aid)
 
     if request.method == 'POST':
         sub_category_id = request.form['sub_category_id']
@@ -551,7 +644,7 @@ def edit_transaction(transaction_id):
                         type = :type,
                         date = :date,
                         detail = :detail
-                    WHERE id = :id
+                    WHERE id = :id AND aikotoba_id = :aid
                     """
                 ),
                 {
@@ -561,6 +654,7 @@ def edit_transaction(transaction_id):
                     "type": transaction_type,
                     "date": transaction_date,
                     "detail": detail,
+                    "aid": _get_current_user_aikotoba_id(),
                 },
             )
         return redirect(url_for('edit'))
@@ -577,7 +671,8 @@ def edit_transaction(transaction_id):
 @app.route('/categories', methods=['GET', 'POST'])
 def categories():
     engine = connect_db()
-    main_categories, sub_categories = get_categories(engine)
+    aid = _get_current_user_aikotoba_id()
+    main_categories, sub_categories = get_categories(engine, aikotoba_id=aid)
 
     if request.method == 'POST':
         main_category_id = request.form['main_category_id']
@@ -602,7 +697,7 @@ def edit_category(sub_category_id):
 
     # Get main category name for display
     main_category_name = ""
-    for main in get_categories(engine)[0]:
+    for main in main_categories:
         if main[0] == sub_category.main_category_id:
             main_category_name = main[1]
             break
@@ -644,7 +739,10 @@ def delete_transaction(transaction_id):
 
 @app.route('/graphs')
 def graphs():
-    monthly_summary_df = get_monthly_summary()
+    import pandas as pd
+    import altair as alt
+    aid = _get_current_user_aikotoba_id()
+    monthly_summary_df = get_monthly_summary(aikotoba_id=aid)
 
     # Month options from data
     if not monthly_summary_df.empty:
@@ -714,6 +812,10 @@ def api_get_sub_categories():
          WHERE 1 = 1
     """
     params = {}
+    # scope by current user's aikotoba
+    aid = _get_current_user_aikotoba_id()
+    query += " AND sc.aikotoba_id = :aid"
+    params['aid'] = aid
     if main_category_id:
         query += " AND sc.main_category_id = :mid"
         params['mid'] = main_category_id
@@ -744,9 +846,11 @@ def api_create_sub_category():
     if not mid or not name:
         return jsonify({"error": "main_category_id と name は必須です"}), 400
     with engine.begin() as conn:
+        # Inherit aikotoba from main category
+        aid = conn.execute(text("SELECT aikotoba_id FROM main_categories WHERE id = :mid"), {"mid": mid}).scalar()
         res = conn.execute(text(
-            "INSERT INTO sub_categories (main_category_id, name) VALUES (:mid, :name)"
-        ), {"mid": mid, "name": name})
+            "INSERT INTO sub_categories (main_category_id, name, aikotoba_id) VALUES (:mid, :name, :aid)"
+        ), {"mid": mid, "name": name, "aid": aid})
         new_id = res.lastrowid
     return jsonify({"id": new_id}), 201
 
@@ -759,7 +863,13 @@ def api_update_sub_category(sub_id: int):
     fields = {k: payload[k] for k in allowed if k in payload}
     if not fields:
         return jsonify({"error": "更新対象フィールドがありません"}), 400
-    set_clause = ", ".join([f"{k} = :{k}" for k in fields.keys()])
+    # If main_category_id changes, sync aikotoba_id from the new main category
+    set_parts = []
+    for k in fields.keys():
+        set_parts.append(f"{k} = :{k}")
+    if 'main_category_id' in fields:
+        set_parts.append("aikotoba_id = (SELECT aikotoba_id FROM main_categories WHERE id = :main_category_id)")
+    set_clause = ", ".join(set_parts)
     fields['id'] = sub_id
     with engine.begin() as conn:
         r = conn.execute(text(f"UPDATE sub_categories SET {set_clause} WHERE id = :id"), fields)

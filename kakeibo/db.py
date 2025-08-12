@@ -4,6 +4,7 @@ import shutil
 import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine, text
+import os
 
 # Runtime DB settings
 # Prefer /data in Docker/Fly. Allow override via env var and fallback in restricted envs.
@@ -36,6 +37,62 @@ def connect_db():
     return ENGINE
 
 
+def _column_exists(conn, table: str, column: str) -> bool:
+    rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+    return any(r[1] == column for r in rows)
+
+
+def ensure_aikotoba_schema():
+    """Ensure aikotoba-based multi-tenancy schema exists and seed defaults.
+
+    - Create aikotoba table if missing
+    - Add aikotoba_id columns to users, main_categories, sub_categories, transactions
+    - Seed a 'public' aikotoba and backfill NULLs
+    """
+    with ENGINE.begin() as conn:
+        # aikotoba table
+        conn.execute(text(
+            """
+            CREATE TABLE IF NOT EXISTS aikotoba (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                label TEXT,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+            """
+        ))
+
+        # add aikotoba_id to tables if missing
+        for table in ("users", "main_categories", "sub_categories", "transactions"):
+            if not _column_exists(conn, table, "aikotoba_id"):
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN aikotoba_id INTEGER"))
+
+        # seed nitome aikotoba
+        nitome_code = "nitome"
+        nitome_label = "ニトメ"
+        conn.execute(text("INSERT OR IGNORE INTO aikotoba (code, label) VALUES (:c, :l)"), {"c": nitome_code, "l": nitome_label})
+        nitome_id = conn.execute(text("SELECT id FROM aikotoba WHERE code = :c"), {"c": nitome_code}).scalar_one()
+
+        # seed public aikotoba
+        public_code = "public"
+        public_label = "公開"
+        conn.execute(text("INSERT OR IGNORE INTO aikotoba (code, label) VALUES (:c, :l)"), {"c": public_code, "l": public_label})
+        public_id = conn.execute(text("SELECT id FROM aikotoba WHERE code = :c"), {"c": public_code}).scalar_one()
+
+        # backfill NULL aikotoba_id with nitome (for existing data)
+        for table in ("users", "main_categories", "sub_categories", "transactions"):
+            conn.execute(text(f"UPDATE {table} SET aikotoba_id = :did WHERE aikotoba_id IS NULL"), {"did": nitome_id})
+
+
+def get_aikotoba_id(code: str) -> int:
+    """Return ID of a specific aikotoba code."""
+    with ENGINE.begin() as conn:
+        conn.execute(text("INSERT OR IGNORE INTO aikotoba (code, label) VALUES (:c, :l)"), {"c": code, "l": code})
+        aid = conn.execute(text("SELECT id FROM aikotoba WHERE code = :c"), {"c": code}).scalar_one()
+        return aid
+
+
 def load_data(sub_category_id: int):
     sql = text(
         """
@@ -52,7 +109,7 @@ def load_data(sub_category_id: int):
     return df
 
 
-def get_budget_and_spent_of_month(month: str):
+def get_budget_and_spent_of_month(month: str, aikotoba_id: int):
     sql = text(
         """
         SELECT
@@ -64,21 +121,27 @@ def get_budget_and_spent_of_month(month: str):
         JOIN main_categories ON sub_categories.main_category_id = main_categories.id
         WHERE main_categories.name = '日常'
           AND transactions.date LIKE :month_like
+          AND transactions.aikotoba_id = :aid
         GROUP BY sub_category_name, type
         """
     )
     with ENGINE.connect() as conn:
-        df = pd.read_sql(sql, conn, params={"month_like": f"{month}%"})
+        df = pd.read_sql(sql, conn, params={"month_like": f"{month}%", "aid": aikotoba_id})
     budget = df[df['type'] == '予算'].groupby('sub_category_name')['total'].sum()
     spent = df[df['type'] == '支出'].groupby('sub_category_name')['total'].sum()
     return spent, budget, df
 
 
-def get_categories(engine=None):
+def get_categories(engine=None, aikotoba_id: int | None = None):
     engine = engine or ENGINE
+    where = ""
+    params = {}
+    if aikotoba_id is not None:
+        where = " WHERE aikotoba_id = :aid"
+        params = {"aid": aikotoba_id}
     with engine.connect() as conn:
-        mains = conn.execute(text("SELECT id, name FROM main_categories")).fetchall()
-        subs = conn.execute(text("SELECT id, main_category_id, name FROM sub_categories")).fetchall()
+        mains = conn.execute(text(f"SELECT id, name FROM main_categories{where}"), params).fetchall()
+        subs = conn.execute(text(f"SELECT id, main_category_id, name FROM sub_categories{where}"), params).fetchall()
     # Convert to list of tuples for UI compatibility
     main_categories = [(m[0], m[1]) for m in mains]
     sub_categories = [(s[0], s[1], s[2]) for s in subs]
@@ -133,19 +196,25 @@ def update_data(df, changes):
         st.error(f"An error occurred: {str(e)}")
 
 
-def get_monthly_summary():
+def get_monthly_summary(aikotoba_id: int | None = None):
     conn = connect_db()
     sql = text(
         """
         SELECT strftime('%Y-%m', date) as month, type, SUM(amount) as total
         FROM transactions
-        WHERE date >= '2023-10-01'
+        WHERE date >= '2023-10-01' {aikotoba_clause}
         GROUP BY month, type
         ORDER BY month
         """
     )
+    params = {}
+    aikotoba_clause = ""
+    if aikotoba_id is not None:
+        aikotoba_clause = "AND aikotoba_id = :aid"
+        params["aid"] = aikotoba_id
+    q = text(sql.text.format(aikotoba_clause=aikotoba_clause))
     with conn.connect() as c:
-        df = pd.read_sql(sql, c)
+        df = pd.read_sql(q, c, params=params)
     pivot_df = df.pivot(index='month', columns='type', values='total').fillna(0)
     # Ensure columns exist even if df is empty
     for col in ['収入', '支出']:
@@ -179,7 +248,7 @@ def get_transaction_by_id(transaction_id: int):
         result = conn.execute(sql, {"id": transaction_id}).fetchone()
     return result
 
-def get_gifts_summary():
+def get_gifts_summary(aikotoba_id: int | None = None):
     engine = connect_db()
     query = text(
         """
@@ -191,14 +260,21 @@ def get_gifts_summary():
     WHERE type IN ('収入', '支出') AND sub_category_id IN (
         SELECT id FROM sub_categories WHERE name = '贈与'
     )
+    {aikotoba_clause}
     GROUP BY detail, type;
     """
     )
+    params = {}
+    aikotoba_clause = ""
+    if aikotoba_id is not None:
+        aikotoba_clause = "AND aikotoba_id = :aid"
+        params["aid"] = aikotoba_id
+    q = text(query.text.format(aikotoba_clause=aikotoba_clause))
     with engine.connect() as conn:
-        df = pd.read_sql(query, conn)
+        df = pd.read_sql(q, conn, params=params)
     return df
 
-def get_unentered_recurring_transactions():
+def get_unentered_recurring_transactions(aikotoba_id: int | None = None):
     engine = connect_db()
     sql = text(
         """
@@ -209,21 +285,30 @@ def get_unentered_recurring_transactions():
                 SELECT id FROM main_categories WHERE name = '定期'
             )
         )
+        {aikotoba_clause}
         AND date = (
             SELECT MAX(date) FROM transactions t2 WHERE t2.detail = transactions.detail
         )
         """
     )
+    params = {}
+    aikotoba_clause = ""
+    if aikotoba_id is not None:
+        aikotoba_clause = "AND aikotoba_id = :aid"
+        params["aid"] = aikotoba_id
+    q = text(sql.text.format(aikotoba_clause=aikotoba_clause))
     with engine.connect() as conn:
-        recurring_transactions = conn.execute(sql).fetchall()
+        recurring_transactions = conn.execute(q, params).fetchall()
     return recurring_transactions
 
 
 def add_sub_category(main_category_id: int, name: str):
     with ENGINE.begin() as conn:
+        # inherit aikotoba_id from main category
+        aid = conn.execute(text("SELECT aikotoba_id FROM main_categories WHERE id = :mid"), {"mid": main_category_id}).scalar()
         conn.execute(
-            text("INSERT INTO sub_categories (main_category_id, name) VALUES (:mid, :name)"),
-            {"mid": main_category_id, "name": name},
+            text("INSERT INTO sub_categories (main_category_id, name, aikotoba_id) VALUES (:mid, :name, :aid)"),
+            {"mid": main_category_id, "name": name, "aid": aid},
         )
 
 def rename_sub_category(sub_category_id: int, new_name: str):

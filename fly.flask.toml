@@ -1,0 +1,26 @@
+app = "kakeibo-flask"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile.flask"
+
+[env]
+  TZ = "Asia/Tokyo"
+
+[http_service]
+  internal_port = 5000
+  force_https = true
+  auto_start_machines = true
+  auto_stop_machines = false   # 常時起動したい場合は false
+  min_machines_running = 1     # 常時1台起動
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+

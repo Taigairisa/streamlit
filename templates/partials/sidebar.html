@@ -21,6 +21,8 @@
                 <li><a class="dropdown-item" href="{{ url_for('categories', month=selected_month) }}">カテゴリー追加・編集</a></li>
                 <li><a class="dropdown-item" href="{{ url_for('graphs', month=selected_month) }}">グラフ</a></li>
                 <li><a class="dropdown-item" href="{{ url_for('dev_options', month=selected_month) }}">開発者オプション</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="{{ url_for('aikotoba_settings', month=selected_month) }}">合言葉ユーザー設定</a></li>
             </ul>
         </div>
 

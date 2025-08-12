@@ -64,6 +64,11 @@
 - 編集: スプレッドシート風 UI（Tabulator）。セル編集/行追加/削除、ソート、ライブ検索。変更時は「旧→新」の確認ダイアログ。CDN不可時は簡易表へフォールバック。
 - 開発者オプション: DB ダウンロード（`/download_db`）、任意 SQL 実行（例外表示）。
 - 認証: 未ログイン時は `/login` にリダイレクト。ログインボタンから LINE OAuth へ遷移（`/login/line` → `/callback/line`）。復帰後に元の画面へ戻る。`/logout` でセッションクリア。
+ - データスコープ（合言葉）: 合言葉（aikotoba）によりデータを分離。ユーザーは自身の合言葉に紐づくデータのみ閲覧・編集可能。
+   - テーブル: `aikotoba(id, code UNIQUE, label, active, created_at)`、各エンティティに `aikotoba_id`（`users`, `main_categories`, `sub_categories`, `transactions`）。
+   - 既定の合言葉: `code='public'` を自動生成し、既存データは public に割当。
+   - 画面: `/aikotoba` で合言葉参加（コード入力）/解除（publicへ）。新規作成は当面不可。
+   - 追加・編集時: 取引は小カテゴリの合言葉を継承。小カテゴリは大カテゴリの合言葉を継承。
 
 ## 開発方針（Design Decisions）
 - 単一ファイル `flask_app.py` + テンプレートで薄く構成。
@@ -176,6 +181,7 @@
  - POST `/api/sub_categories`（小カテゴリの新規作成）
  - PATCH `/api/sub_categories/<id>`（小カテゴリの名前・大カテゴリ更新）
 - DELETE `/api/sub_categories/<id>`（小カテゴリ削除・関連取引も削除）
+ すべての変更系APIはユーザーの `aikotoba_id` と一致するデータのみに作用（テナント越境を防止）。
 
 認証ガード
 - `@app.before_request` でガード。未認証時は `/login` へ。
