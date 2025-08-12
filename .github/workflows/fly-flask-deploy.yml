@@ -1,0 +1,105 @@
+name: Fly Flask Deploy
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: Deploy Flask app
+    runs-on: ubuntu-latest
+    concurrency: deploy-flask-group
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Prepare Flask fly config (derived from fly.toml)
+        id: prep
+        run: |
+          set -e
+          # Base values (can be overridden by repo variables)
+          APP=${{ vars.FLY_FLASK_APP_NAME }}
+          REGION=${{ vars.FLY_REGION }}
+          # Fallback to values from fly.toml if vars are not provided
+          if [ -z "$APP" ]; then APP=$(awk -F'"' '/^app\s*=/{print $2; exit}' fly.toml); fi
+          if [ -z "$REGION" ]; then REGION=$(awk -F'"' '/^primary_region\s*=/{print $2; exit}' fly.toml); fi
+
+          # Create a Flask-specific config by adjusting dockerfile and internal_port
+          cp fly.toml fly.flask.toml
+          # Ensure [build] dockerfile points to Dockerfile.flask
+          if grep -q '^\s*dockerfile\s*=\s*"Dockerfile"' fly.flask.toml; then
+            sed -i 's#dockerfile\s*=\s*"Dockerfile"#dockerfile = "Dockerfile.flask"#' fly.flask.toml
+          else
+            # Insert build section if missing
+            printf '\n[build]\n  dockerfile = "Dockerfile.flask"\n' >> fly.flask.toml
+          fi
+          # Set internal_port to 5000 for Flask
+          awk 'BEGIN{in_http=0} \
+               /^\[http_service\]/{in_http=1; print; next} \
+               in_http && /^\[/{in_http=0} \
+               { \
+                 if(in_http && $1=="internal_port") { print "  internal_port = 5000"; next } \
+                 print \
+               }' fly.flask.toml > fly.flask.toml.tmp && mv fly.flask.toml.tmp fly.flask.toml
+
+          echo "app=$APP" >> $GITHUB_OUTPUT
+          echo "region=$REGION" >> $GITHUB_OUTPUT
+
+      - name: Ensure volume exists (data)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          APP: ${{ steps.prep.outputs.app }}
+          REGION: ${{ steps.prep.outputs.region }}
+        run: |
+          set -e
+          echo "App=${APP} Region=${REGION}"
+          set +e
+          flyctl volumes list --app "$APP" | grep -q " data "
+          HASVOL=$?
+          set -e
+          if [ "$HASVOL" -ne 0 ]; then
+            flyctl volumes create data --size 1 --region "$REGION" --app "$APP"
+          fi
+
+      - name: Set runtime secrets (LINE/Flask)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          APP: ${{ steps.prep.outputs.app }}
+          # Accept both CHANNEL_* and CLIENT_* naming
+          LINE_CHANNEL_ID: ${{ secrets.LINE_CHANNEL_ID }}
+          LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          LINE_CLIENT_ID: ${{ secrets.LINE_CLIENT_ID }}
+          LINE_CLIENT_SECRET: ${{ secrets.LINE_CLIENT_SECRET }}
+          LINE_REDIRECT_URI: ${{ secrets.LINE_REDIRECT_URI }}
+          FLASK_SECRET_KEY: ${{ secrets.FLASK_SECRET_KEY }}
+        run: |
+          set -e
+          # LINE Login / Flask secrets are optional but recommended
+          if [ -n "$LINE_CHANNEL_ID" ]; then
+            flyctl secrets set LINE_CHANNEL_ID="$LINE_CHANNEL_ID" --app "$APP"
+          fi
+          if [ -n "$LINE_CHANNEL_SECRET" ]; then
+            flyctl secrets set LINE_CHANNEL_SECRET="$LINE_CHANNEL_SECRET" --app "$APP"
+          fi
+          if [ -n "$LINE_CLIENT_ID" ]; then
+            flyctl secrets set LINE_CLIENT_ID="$LINE_CLIENT_ID" --app "$APP"
+          fi
+          if [ -n "$LINE_CLIENT_SECRET" ]; then
+            flyctl secrets set LINE_CLIENT_SECRET="$LINE_CLIENT_SECRET" --app "$APP"
+          fi
+          if [ -n "$LINE_REDIRECT_URI" ]; then
+            flyctl secrets set LINE_REDIRECT_URI="$LINE_REDIRECT_URI" --app "$APP"
+          fi
+          if [ -n "$FLASK_SECRET_KEY" ]; then
+            flyctl secrets set FLASK_SECRET_KEY="$FLASK_SECRET_KEY" --app "$APP"
+          fi
+
+      - name: Deploy (Flask)
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          flyctl deploy --remote-only -c fly.flask.toml
+
