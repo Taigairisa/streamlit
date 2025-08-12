@@ -35,6 +35,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const pageSize = parseInt(pageSizeSel.value || '50', 10);
     table = new Tabulator(gridEl, {
       layout: 'fitColumns',
+      responsiveLayout: 'hide', // Added responsive layout
       height: '600px',
       selectable: true,
       clipboard: true,
