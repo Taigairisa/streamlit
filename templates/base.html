@@ -16,15 +16,19 @@
 </head>
 <body>
     <div class="container-fluid">
+        {% if session.get('auth_user') %}
         <!-- Sidebar open button -->
         <button id="sidebarOpenBtn" class="btn btn-primary sidebar-open-btn" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas">&gt;</button>
 
         <!-- Offcanvas Sidebar (partial) -->
         {% include 'partials/sidebar.html' %}
+        {% endif %}
 
         <div class="row">
             <main class="col-12 px-md-4">
+                {% if session.get('auth_user') %}
                 {% include 'partials/top_progress.html' %}
+                {% endif %}
                 <div class="pt-3 pb-2 mb-3 border-bottom">
                     {% block header %}{% endblock %}
                 </div>

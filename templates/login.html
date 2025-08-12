@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}ログイン - Kakeibo App{% endblock %}
+
+{% block header %}
+  <h1>ログイン</h1>
+{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">認証が必要です</h5>
+          <p class="text-muted mb-4">LINEでログインして利用を開始してください。</p>
+          <a href="{{ url_for('login_line') }}" class="btn btn-success w-100">LINEでログイン</a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

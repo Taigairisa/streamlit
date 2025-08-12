@@ -18,6 +18,37 @@ app = Flask(__name__)
 # Minimal secret key for session (override via env in production)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret')
 
+def _is_api_request() -> bool:
+    try:
+        return request.path.startswith('/api/')
+    except Exception:
+        return False
+
+@app.before_request
+def require_login_guard():
+    # Exempt paths
+    exempt_prefixes = ['/static/']
+    exempt_paths = {
+        '/', '/login', '/login/line', '/callback/line', '/favicon.ico'
+    }
+    path = request.path
+    if any(path.startswith(prefix) for prefix in exempt_prefixes) or path in exempt_paths:
+        return None
+    # Allow health checks if any
+    if path.startswith('/health'):
+        return None
+    # Require session
+    if not session.get('auth_user'):
+        # Remember where to return after login (only for non-API)
+        if not _is_api_request():
+            session['post_login_redirect'] = request.full_path or path
+            # Avoid trailing '?' if no query
+            if session['post_login_redirect'].endswith('?'):
+                session['post_login_redirect'] = session['post_login_redirect'][:-1]
+            return redirect(url_for('login'))
+        else:
+            return jsonify({"error": "Unauthorized"}), 401
+
 def get_sidebar_data(selected_month=None):
     # Month selection for budget progress
     months = [
@@ -124,6 +155,13 @@ def add():
         today=date.today().strftime('%Y-%m-%d'),
         **get_sidebar_data(selected_month=request.args.get('month'))
     )
+
+@app.route('/login')
+def login():
+    # Show login page; if already logged in, go to index
+    if session.get('auth_user'):
+        return redirect(url_for('index'))
+    return render_template('login.html', **get_sidebar_data(selected_month=request.args.get('month')))
 
 @app.route('/edit')
 def edit():
@@ -480,6 +518,10 @@ def callback_line():
     if not _user_exists(username):
         _create_user(username)
     session['auth_user'] = username
+    # Redirect back to the original page if available
+    next_url = session.pop('post_login_redirect', None)
+    if next_url and isinstance(next_url, str) and next_url.startswith('/'):
+        return redirect(next_url)
     return redirect(url_for('index'))
 
 @app.route('/edit/<int:transaction_id>', methods=['GET', 'POST'])

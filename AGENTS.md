@@ -63,7 +63,7 @@
 - グラフ: 月次収支/累計資産（開始/終了月フィルタ対応）。
 - 編集: スプレッドシート風 UI（Tabulator）。セル編集/行追加/削除、ソート、ライブ検索。変更時は「旧→新」の確認ダイアログ。CDN不可時は簡易表へフォールバック。
 - 開発者オプション: DB ダウンロード（`/download_db`）、任意 SQL 実行（例外表示）。
-- LINE ログイン: `GET /login/line` → `GET /callback/line`（最小実装）。`/logout` でセッションクリア。
+- 認証: 未ログイン時は `/login` にリダイレクト。ログインボタンから LINE OAuth へ遷移（`/login/line` → `/callback/line`）。復帰後に元の画面へ戻る。`/logout` でセッションクリア。
 
 ## 開発方針（Design Decisions）
 - 単一ファイル `flask_app.py` + テンプレートで薄く構成。
@@ -175,7 +175,12 @@
  - GET `/api/sub_categories`（クエリ: `main_category_id`, `q` ライブ検索）
  - POST `/api/sub_categories`（小カテゴリの新規作成）
  - PATCH `/api/sub_categories/<id>`（小カテゴリの名前・大カテゴリ更新）
- - DELETE `/api/sub_categories/<id>`（小カテゴリ削除・関連取引も削除）
+- DELETE `/api/sub_categories/<id>`（小カテゴリ削除・関連取引も削除）
+
+認証ガード
+- `@app.before_request` でガード。未認証時は `/login` へ。
+- API への未認証アクセスは `401 Unauthorized`（JSON）を返す。
+- 例外: `/static/*`, `/login`, `/login/line`, `/callback/line`, `/` は許可。
 
 ---
 この AGENTS.md は「最新の“作業の仕方”」をまとめる場所です。変更がユーザー体験や運用に影響する場合、README と併せて本書も更新してください。
@@ -212,8 +217,6 @@
 ## ToDoリスト（Flask版）
 
 以下の機能はStreamlit版に存在しますが、Flask版では未実装または簡素化されています。
-- **開発者オプションのバグ:** 現在のflask_app.pyでは開発者オプションにアクセスするとInternalServerErrorになります。
-- **編集ページでの表形式の直接編集機能:** Streamlitの`st.data_editor`のような、表内で直接データの追加・更新・削除を行う機能は実装されていません。個別フォームでの編集・削除となっています。
 - **サイドバーからの未入力月額のインタラクティブな追加:** Streamlit版ではサイドバーから直接、未入力の定期取引の金額入力と追加が可能でしたが、Flask版では一覧表示のみで、追加は「追加」ページで行う必要があります。
 - **認証機能:** Streamlit版に存在するDBログイン、LINEログインなどの認証機能は、Flask版では未実装です。
 - **ログアウトボタンの機能:** ログアウトボタンは設置されていますが、機能は未実装です。
