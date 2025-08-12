@@ -198,18 +198,18 @@
                 pagination: pageSize > 0 ? 'local' : false,
                 paginationSize: pageSize > 0 ? pageSize : undefined,
                 columns: [
-                    {title:'ID', field:'id', width:60, hozAlign:'right', headerHozAlign:'right', sorter:'number'},
-                    {title:'日付', field:'date', editor:'input', sorter:'datetime', sorterParams:{format:'YYYY-MM-DD'}, validator:[{type:'regex', param:/^\d{4}-\d{2}-\d{2}$/}]},
-                    {title:'詳細', field:'detail', editor:'input', sorter:'string'},
-                    {title:'種別', field:'type', editor:'select', editorParams:{values:{'支出':'支出','収入':'収入','予算':'予算'}}, sorter:'string', validator:[{type:'in', parameters:['支出','収入','予算']}]},
-                    {title:'金額', field:'amount', hozAlign:'right', editor:'number', editorParams:{min:0, step:1}, sorter:'number', mutatorData:(v)=> (v===''||v==null? null : parseInt(v,10)), validator:[{type:'required'},{type:'integer'},{type:'min', parameters:0}], bottomCalc:'sum'},
-                    {title:'小カテゴリ', field:'sub_category_id', editor:subEditor, sorter:'number', validator:[{type:'required'}], mutatorData:(v)=>parseInt(v,10)},
-                    {title:'操作', formatter:()=>'\u003Cbutton class="btn btn-sm btn-danger"\u003E削除\u003C/button\u003E', width:90, cellClick:(e, cell)=>{
+                    {title:'ID', field:'id', width:60, minWidth:60, hozAlign:'right', headerHozAlign:'right', sorter:'number'},
+                    {title:'日付', field:'date', editor:'input', sorter:'datetime', sorterParams:{format:'YYYY-MM-DD'}, validator:[{type:'regex', param:/^\d{4}-\d{2}-\d{2}$/}], minWidth:100},
+                    {title:'詳細', field:'detail', editor:'input', sorter:'string', minWidth:120},
+                    {title:'種別', field:'type', editor:'select', editorParams:{values:{'支出':'支出','収入':'収入','予算':'予算'}}, sorter:'string', validator:[{type:'in', parameters:['支出','収入','予算']}], minWidth:80},
+                    {title:'金額', field:'amount', hozAlign:'right', editor:'number', editorParams:{min:0, step:1}, sorter:'number', mutatorData:(v)=> (v===''||v==null? null : parseInt(v,10)), validator:[{type:'required'},{type:'integer'},{type:'min', parameters:0}], bottomCalc:'sum', minWidth:80},
+                    {title:'小カテゴリ', field:'sub_category_id', editor:subEditor, sorter:'number', validator:[{type:'required'}], mutatorData:(v)=>parseInt(v,10), minWidth:120},
+                    {title:'操作', formatter:()=>'\u003Cbutton class="btn btn-sm btn-danger"\u003E削除\u003C/button\u003E', width:90, minWidth:90, cellClick:(e, cell)=>{
                         const row = cell.getRow(); const data = row.getData();
                         if (!confirm('本当に削除しますか？')) return;
                         if (data.id){ fetch(`{{ url_for('api_delete_transaction', transaction_id=0) }}`.replace('/0','/'+data.id), {method:'DELETE'})
                             .then(()=>row.delete());
-                        } else { row.delete(); }
+                        } else { row.row.delete(); }
                     }}
                 ],
                 ajaxURL: buildApiUrl(),
