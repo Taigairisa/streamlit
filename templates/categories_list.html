@@ -7,60 +7,56 @@
 {% endblock %}
 
 {% block content %}
+    <link href="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+
     <div class="card mb-4">
-        <div class="card-header">新しい小カテゴリを追加</div>
+        <div class="card-header">フィルター</div>
         <div class="card-body">
-            <form method="POST" action="{{ url_for('categories') }}">
-                <div class="mb-3">
-                    <label for="mainCategorySelect" class="form-label">大カテゴリ</label>
-                    <select class="form-select" id="mainCategorySelect" name="main_category_id" required>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="catMainSelect" class="form-label">大カテゴリ</label>
+                    <select class="form-select" id="catMainSelect" name="main_category_id">
+                        <option value="">すべて</option>
                         {% for main in main_categories %}
                             <option value="{{ main[0] }}">{{ main[1] }}</option>
                         {% endfor %}
                     </select>
                 </div>
-                <div class="mb-3">
-                    <label for="newSubCategoryName" class="form-label">新しい小カテゴリ名</label>
-                    <input type="text" class="form-control" id="newSubCategoryName" name="name" required>
+                <div class="col-md-4">
+                    <label for="catLiveFilter" class="form-label">ライブ検索</label>
+                    <input type="text" class="form-control" id="catLiveFilter" placeholder="例: 食費, 生活 など">
                 </div>
-                <button type="submit" class="btn btn-primary">追加</button>
-            </form>
+                <div class="col-md-2">
+                    <label for="catPageSize" class="form-label">表示件数</label>
+                    <select id="catPageSize" class="form-select">
+                        <option value="20">20</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="0">すべて</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-header">既存のカテゴリ</div>
-        <div class="card-body">
-            {% for main in main_categories %}
-                <h4>{{ main[1] }}</h4>
-                <table class="table table-striped table-sm">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>小カテゴリ名</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for sub in sub_categories %}
-                            {% if sub[1] == main[0] %}
-                            <tr>
-                                <td>{{ sub[0] }}</td>
-                                <td>{{ sub[2] }}</td>
-                                <td>
-                                    <a href="{{ url_for('edit_category', sub_category_id=sub[0]) }}" class="btn btn-sm btn-primary">編集</a>
-                                    <form action="{{ url_for('delete_category', sub_category_id=sub[0]) }}" method="POST" style="display:inline;" onsubmit="return confirm('本当に削除しますか？このカテゴリに紐づく取引も削除されます。');">
-                                        <button type="submit" class="btn btn-sm btn-danger">削除</button>
-                                    </form>
-                                </td>
-                            </tr>
-                            {% endif %}
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p>カテゴリがありません。</p>
-            {% endfor %}
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="btn-group">
+            <button id="catAddRowBtn" class="btn btn-sm btn-primary">小カテゴリを追加</button>
+            <button id="catReloadBtn" class="btn btn-sm btn-outline-secondary">再読込</button>
+            <button id="catUndoBtn" class="btn btn-sm btn-outline-secondary">元に戻す</button>
+            <button id="catRedoBtn" class="btn btn-sm btn-outline-secondary">やり直す</button>
         </div>
+        <div><small class="text-muted" id="catTableInfo"></small></div>
     </div>
+    <div id="catAlertArea"></div>
+    <div id="categoriesGrid"></div>
+
+{% endblock %}
+
+{% block scripts %}
+    <script id="mainCategoriesData" type="application/json">{{ main_categories | tojson }}</script>
+    <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
+    <script src="https://unpkg.com/tabulator-tables/dist/js/tabulator.min.js"></script>
+    <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
 {% endblock %}

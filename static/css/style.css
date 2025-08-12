@@ -120,3 +120,23 @@ body {
 .progress-bar {
     background-color: var(--color-primary);
 }
+
+/* Sidebar open button (when sidebar is closed) */
+.sidebar-open-btn {
+    position: fixed;
+    top: 1rem;
+    left: 0.5rem;
+    z-index: 1050; /* above content, below modal */
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
+    border-radius: var(--border-radius-1);
+}
+
+/* Top progress card tweaks */
+#topProgressCard .card-header {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+#topProgressCard select.form-select-sm {
+    min-width: 9rem;
+}

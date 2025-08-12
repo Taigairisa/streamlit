@@ -26,7 +26,11 @@
 - `flask_app.py`: Flask エントリーポイント（ルーティング/テンプレート描画）。
 - `kakeibo/db.py`: DB 接続・クエリ・更新・月次集計のユーティリティ。
 - `templates/`: Jinja2 テンプレート（`base.html`, `index.html`, `add.html`, `edit_list.html`, `graphs.html`, `dev_options.html`）。
+- `templates/partials/`: Jinja2 パーシャル（`sidebar.html` などの共通断片）。
 - `static/`: カスタム CSS（Bootstrap/Google Fonts/CDN を併用）。
+  - `static/css/style.css`: 全体スタイルとコンポーネント。
+  - `static/js/main.js`: グローバル挙動（サイドバー開閉、月セレクト）。
+  - `static/js/graphs.js`: グラフページ専用の描画・UI制御。
 - `data/kakeibo.db`: 初期 DB（シード）。
 - `start-flask.sh` / `Dockerfile.flask`: Flask 起動用。
 - `fly.toml`: Fly.io 設定（`/data` マウント含む）。
@@ -52,7 +56,8 @@
 - `load_data` は文字列整形で SQL を生成（SQL インジェクション懸念）。改修時はプレースホルダを使う。
 
 ## 画面/機能の要点（Flask 現状）
-- 予算進捗: サイドバーで選択した月のプログレス（URLの`month`を全ページで維持）。
+- 予算進捗: 全ページ上部のカードに表示。月の選択も同カードで変更可能（折りたたみ可）。URL の `month` を全ページで維持。
+- サイドバー: オフキャンバス化（開/閉ボタンあり）。メニューはドロップダウンに集約。リンククリックで自動クローズ。
 - 贈与見える化: 「贈与」小カテゴリの収入/支出の対比。
 - 未入力の月額: 定期カテゴリの未入力リマインド。
 - グラフ: 月次収支/累計資産（開始/終了月フィルタ対応）。
@@ -167,6 +172,10 @@
 - POST `/api/transactions`（新規作成）
 - PATCH `/api/transactions/<id>`（部分更新）
 - DELETE `/api/transactions/<id>`（削除）
+ - GET `/api/sub_categories`（クエリ: `main_category_id`, `q` ライブ検索）
+ - POST `/api/sub_categories`（小カテゴリの新規作成）
+ - PATCH `/api/sub_categories/<id>`（小カテゴリの名前・大カテゴリ更新）
+ - DELETE `/api/sub_categories/<id>`（小カテゴリ削除・関連取引も削除）
 
 ---
 この AGENTS.md は「最新の“作業の仕方”」をまとめる場所です。変更がユーザー体験や運用に影響する場合、README と併せて本書も更新してください。
@@ -190,10 +199,10 @@
 - Google Fonts (Noto Sans JP) と Material Icons を導入し、UIの視覚的洗練を実施。
 
 ### 機能ごとの実装詳細
-- **ホーム (`/`)**: メインカテゴリ選択とサイドバー表示。
+- **ホーム (`/`)**: `追加 (/add)` へリダイレクト。
 - **追加 (`/add`)**: 取引データの追加フォーム。大カテゴリ連動の小カテゴリ選択。
 - **編集 (`/edit`)**: 取引データの一覧表示、フィルター機能（大カテゴリ、小カテゴリ、日付範囲、ライブフィルター）。個別の取引の編集 (`/edit/<id>`) および削除 (`/delete/<id>`)。
-- **カテゴリー追加・編集 (`/categories`)**: 小カテゴリの追加、既存小カテゴリのリネーム (`/categories/edit/<id>`)、削除 (`/categories/delete/<id>`)。
+- **カテゴリー追加・編集 (`/categories`)**: Tabulator によるスプレッドシート風 UI。インライン編集・行追加・削除・ライブ検索・ページング。従来の個別編集 (`/categories/edit/<id>`) も互換のため残置。
 - **グラフ (`/graphs`)**: 月次収支と累計資産のグラフ表示。AltairでJSONを生成し、Vega-Lite.jsで描画。
 - **開発者オプション (`/dev`)**: データベースファイルのダウンロード (`/download_db`)、任意のSQL実行機能。
 
@@ -209,3 +218,16 @@
 - **認証機能:** Streamlit版に存在するDBログイン、LINEログインなどの認証機能は、Flask版では未実装です。
 - **ログアウトボタンの機能:** ログアウトボタンは設置されていますが、機能は未実装です。
 - **Google Sheets/Gemini連携:** Streamlit版でもコメントアウトされていましたが、Flask版でも未実装です。
+
+### フロントエンド資産の構成（指針）
+- JS は基本的に `static/js/` に配置し、テンプレート内のインライン `<script>` は避ける。
+  - ページ固有の JS は `base.html` の `{% block scripts %}` で読み込む（例: `graphs.html` → `graphs.js`）。
+  - サーバー生成のデータは `<script type="application/json" id="...">{...}</script>` に埋め込み、JS 側で `JSON.parse` して利用する。
+- 共通 UI は `templates/partials/` に切り出して `{% include %}` で再利用（例: `partials/sidebar.html`）。
+- CSS は `static/css/` に置き、必要に応じてコンポーネント単位へ分割可。
+
+### 最近のUI/UX更新（要約）
+- サイドバーをオフキャンバス化し、開閉ボタン（`>`/`×`）を追加。ナビゲーションはドロップダウン化。リンククリックで自動クローズ。
+- 「月の選択」と「予算進捗」を全ページ上部のカードに移設（`templates/partials/top_progress.html`）。折りたたみトグル対応（▲/▼）。
+- ルート `/` は `add` にリダイレクト。サイドバーの「ホーム」は `add` を指す。
+- カテゴリー管理を編集ページ同等のスプレッドシート UX に刷新。対応する JSON API を追加（上記参照）。

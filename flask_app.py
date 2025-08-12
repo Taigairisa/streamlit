@@ -82,10 +82,10 @@ def get_sidebar_data(selected_month=None):
 
 @app.route('/')
 def index():
-    engine = connect_db()
-    main_categories, _ = get_categories(engine)
-    sidebar_data = get_sidebar_data(selected_month=request.args.get('month'))
-    return render_template('index.html', main_categories=main_categories, **sidebar_data)
+    month = request.args.get('month')
+    if month:
+        return redirect(url_for('add', month=month))
+    return redirect(url_for('add'))
 
 @app.route('/add', methods=['GET', 'POST'])
 def add():
@@ -656,6 +656,81 @@ def graphs():
         selected_end_month=selected_end,
         **get_sidebar_data(selected_month=request.args.get('month'))
     )
+
+# ===== Sub-category JSON API (for categories UX) =====
+
+@app.get('/api/sub_categories')
+def api_get_sub_categories():
+    engine = connect_db()
+    main_category_id = request.args.get('main_category_id')
+    q = request.args.get('q')
+    query = """
+        SELECT sc.id, sc.name as sub_name, sc.main_category_id,
+               mc.name as main_name
+          FROM sub_categories sc
+          JOIN main_categories mc ON sc.main_category_id = mc.id
+         WHERE 1 = 1
+    """
+    params = {}
+    if main_category_id:
+        query += " AND sc.main_category_id = :mid"
+        params['mid'] = main_category_id
+    if q:
+        query += " AND (sc.name LIKE :q OR mc.name LIKE :q)"
+        params['q'] = f"%{q}%"
+    query += " ORDER BY mc.id ASC, sc.id ASC"
+    with engine.connect() as conn:
+        rows = conn.execute(text(query), params).mappings().all()
+        data = [
+            {
+                'id': r['id'],
+                'name': r['sub_name'],
+                'main_category_id': r['main_category_id'],
+                'main_category_name': r['main_name'],
+            }
+            for r in rows
+        ]
+    return jsonify(data)
+
+
+@app.post('/api/sub_categories')
+def api_create_sub_category():
+    engine = connect_db()
+    payload = request.get_json(force=True, silent=True) or {}
+    mid = payload.get('main_category_id')
+    name = payload.get('name')
+    if not mid or not name:
+        return jsonify({"error": "main_category_id と name は必須です"}), 400
+    with engine.begin() as conn:
+        res = conn.execute(text(
+            "INSERT INTO sub_categories (main_category_id, name) VALUES (:mid, :name)"
+        ), {"mid": mid, "name": name})
+        new_id = res.lastrowid
+    return jsonify({"id": new_id}), 201
+
+
+@app.patch('/api/sub_categories/<int:sub_id>')
+def api_update_sub_category(sub_id: int):
+    engine = connect_db()
+    payload = request.get_json(force=True, silent=True) or {}
+    allowed = {'name', 'main_category_id'}
+    fields = {k: payload[k] for k in allowed if k in payload}
+    if not fields:
+        return jsonify({"error": "更新対象フィールドがありません"}), 400
+    set_clause = ", ".join([f"{k} = :{k}" for k in fields.keys()])
+    fields['id'] = sub_id
+    with engine.begin() as conn:
+        r = conn.execute(text(f"UPDATE sub_categories SET {set_clause} WHERE id = :id"), fields)
+    return jsonify({"updated": r.rowcount})
+
+
+@app.delete('/api/sub_categories/<int:sub_id>')
+def api_delete_sub_category(sub_id: int):
+    engine = connect_db()
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM transactions WHERE sub_category_id = :sid"), {"sid": sub_id})
+        r = conn.execute(text("DELETE FROM sub_categories WHERE id = :sid"), {"sid": sub_id})
+    return jsonify({"deleted": r.rowcount})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
