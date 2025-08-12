@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}合言葉設定 - Kakeibo App{% endblock %}
+
+{% block header %}
+  <h1>合言葉ユーザー設定</h1>
+{% endblock %}
+
+{% block content %}
+  <div class="row">
+    <div class="col-12 col-lg-8">
+      <div class="card mb-3">
+        <div class="card-header">現在の合言葉</div>
+        <div class="card-body d-flex justify-content-between align-items-center">
+          <div>
+            <div><strong>コード:</strong> <code>{{ current.code }}</code></div>
+            <div class="text-muted"><small>ラベル: {{ current.label }}</small></div>
+          </div>
+          <form method="POST" action="{{ url_for('leave_aikotoba') }}" onsubmit="return confirm('合言葉を解除して公開（public）に戻します。よろしいですか？');">
+            <button type="submit" class="btn btn-outline-danger">解除（publicへ）</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">合言葉に参加</div>
+        <div class="card-body">
+          {% if session.get('aikotoba_error') %}
+            <div class="alert alert-warning py-2">{{ session.pop('aikotoba_error') }}</div>
+          {% endif %}
+          <form method="POST" action="{{ url_for('join_aikotoba') }}" class="row g-3 align-items-end">
+            <div class="col-md-6">
+              <label for="aikotobaCode" class="form-label">合言葉コード</label>
+              <input type="text" class="form-control" id="aikotobaCode" name="code" placeholder="例: team-2025" required>
+            </div>
+            <div class="col-md-3">
+              <button type="submit" class="btn btn-primary w-100">参加する</button>
+            </div>
+          </form>
+          <small class="text-muted d-block mt-2">※ 合言葉の新規作成は当面不可。既存のコードを入力してください。</small>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
