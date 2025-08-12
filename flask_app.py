@@ -6,13 +6,12 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 from datetime import date
 from sqlalchemy import text
 from kakeibo.db import connect_db, get_categories, get_transaction_by_id, add_sub_category, rename_sub_category, delete_sub_category, get_sub_category_by_id, get_monthly_summary, DB_FILENAME, get_gifts_summary, get_unentered_recurring_transactions, get_budget_and_spent_of_month
-import altair as alt
 import json
 from flask import send_file
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import pytz
-import pandas as pd
+# Note: Heavy libs (pandas, altair) are imported lazily in routes that need them
 
 app = Flask(__name__)
 # Minimal secret key for session (override via env in production)
@@ -161,7 +160,7 @@ def login():
     # Show login page; if already logged in, go to index
     if session.get('auth_user'):
         return redirect(url_for('index'))
-    return render_template('login.html', **get_sidebar_data(selected_month=request.args.get('month')))
+    return render_template('login.html')
 
 @app.route('/edit')
 def edit():
@@ -644,6 +643,8 @@ def delete_transaction(transaction_id):
 
 @app.route('/graphs')
 def graphs():
+    import pandas as pd
+    import altair as alt
     monthly_summary_df = get_monthly_summary()
 
     # Month options from data
