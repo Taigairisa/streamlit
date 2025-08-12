@@ -4,7 +4,7 @@
 
 ## プロジェクト概要
 - 目的: 家計簿（支出/収入/予算）を記録し、進捗・推移を可視化する。
-- 技術: Python 3.12 / Streamlit / SQLite。
+- 技術: Python 3.12 / Flask / Jinja2 / SQLite（Streamlit 由来のコードも一部残置）。
 - データ: SQLite DB を `/data/kakeibo.db` に永続化。初回は `data/kakeibo.db` をコピー（Docker）または空スキーマ生成。
 - デプロイ: Docker でコンテナ化、Fly.io で運用（ボリューム `/data`）。
 - 主要画面: 追加、編集、カテゴリー追加・編集、グラフ、開発者オプション。
@@ -23,18 +23,16 @@
 
 
 ## リポジトリマップ（最重要だけ）
-- `app.py`: エントリーポイント（ページ振り分けのみ）。
+- `flask_app.py`: Flask エントリーポイント（ルーティング/テンプレート描画）。
 - `kakeibo/db.py`: DB 接続・クエリ・更新・月次集計のユーティリティ。
-- `kakeibo/views/sidebar.py`: サイドバー（予算進捗/贈与見える化/未入力月額）。
-- `kakeibo/pages/`
-  - `add_page.py`: 追加
-  - `edit_page.py`: 編集
-  - `categories_page.py`: カテゴリー追加・編集
-  - `graphs_page.py`: グラフ
-  - `dev_page.py`: 開発者オプション
+- `templates/`: Jinja2 テンプレート（`base.html`, `index.html`, `add.html`, `edit_list.html`, `graphs.html`, `dev_options.html`）。
+- `templates/partials/`: Jinja2 パーシャル（`sidebar.html` などの共通断片）。
+- `static/`: カスタム CSS（Bootstrap/Google Fonts/CDN を併用）。
+  - `static/css/style.css`: 全体スタイルとコンポーネント。
+  - `static/js/main.js`: グローバル挙動（サイドバー開閉、月セレクト）。
+  - `static/js/graphs.js`: グラフページ専用の描画・UI制御。
 - `data/kakeibo.db`: 初期 DB（シード）。
-- `start.sh`: 起動時に `/data/kakeibo.db` を用意→Streamlit 起動。
-- `Dockerfile`: 依存解決は `uv`、ポート 8501 で待受。
+- `start-flask.sh` / `Dockerfile.flask`: Flask 起動用。
 - `fly.toml`: Fly.io 設定（`/data` マウント含む）。
 - `.streamlit/secrets.toml`: Secrets（注意: 機密は本来コミットしない）。
 - `requirements.txt` / `pyproject.toml`: 依存一覧。
@@ -57,16 +55,18 @@
 注意
 - `load_data` は文字列整形で SQL を生成（SQL インジェクション懸念）。改修時はプレースホルダを使う。
 
-## 画面/機能の要点
-- 予算進捗: 「日常」カテゴリについて、当月の支出/予算を比較し進捗バー表示。
-- 贈与見える化: 小カテゴリ「贈与」を対象に、収入（受領）と支出（返礼）を突合。
-- 未入力の月額: 定期カテゴリの直近入力日から1か月経過した項目を入力誘導。
-- グラフ: 2023-10 以降の月次「収入/支出」「累計資産」。
-- 開発者オプション: DB ダウンロード、任意 SQL 実行（バックアップ系はコメントアウト）。
-- Google Sheets/Gemini: コードは存在するが現状コメントアウト（無効）。
+## 画面/機能の要点（Flask 現状）
+- 予算進捗: 全ページ上部のカードに表示。月の選択も同カードで変更可能（折りたたみ可）。URL の `month` を全ページで維持。
+- サイドバー: オフキャンバス化（開/閉ボタンあり）。メニューはドロップダウンに集約。リンククリックで自動クローズ。
+- 贈与見える化: 「贈与」小カテゴリの収入/支出の対比。
+- 未入力の月額: 定期カテゴリの未入力リマインド。
+- グラフ: 月次収支/累計資産（開始/終了月フィルタ対応）。
+- 編集: スプレッドシート風 UI（Tabulator）。セル編集/行追加/削除、ソート、ライブ検索。変更時は「旧→新」の確認ダイアログ。CDN不可時は簡易表へフォールバック。
+- 開発者オプション: DB ダウンロード（`/download_db`）、任意 SQL 実行（例外表示）。
+- 認証: 未ログイン時は `/login` にリダイレクト。ログインボタンから LINE OAuth へ遷移（`/login/line` → `/callback/line`）。復帰後に元の画面へ戻る。`/logout` でセッションクリア。
 
 ## 開発方針（Design Decisions）
-- 単一ファイル `app.py` に集約（小規模・迅速性優先）。
+- 単一ファイル `flask_app.py` + テンプレートで薄く構成。
 - DB は SQLite を単純利用。外部同期（Google Sheets）は将来機能として温存。
 - 永続化パスは `/data` を正とし、Docker/Fly で扱いやすくする。
 - 変更は局所的・最小限に行い、既存の UI/UX を壊さない。
@@ -78,15 +78,11 @@
 - 例外処理: ユーザーには `st.error`/`st.warning` で分かりやすく通知。
 - 依存: 既存の依存に追加する前に用途を README/本書に記載。
 
-## セキュリティ/運用
-- Secrets: `.streamlit/secrets.toml` に機密を置く想定。公開リポジトリではコミットしないこと。
+- Secrets: `.streamlit/secrets.toml` は旧来の名残。Flask は環境変数（例: `FLASK_SECRET_KEY`）。
 - 現在リポにシークレット相当ファイルが含まれるため、実運用ではキーのローテーションと外部秘匿を強く推奨。
 - SQL: SQLAlchemy（Core）でパラメータ化済み（`text()` + バインド変数）。
 - データ消失対策: バックアップ機能（Google Sheets）は無効。必要なら再有効化し、検証のうえ段階導入。
- - 認証: DB ログインに加えて LINE ログインをサポート。
-   - DB ログイン: 「ユーザー名でログイン/新規登録」。PWは PBKDF2-HMAC-SHA256 (100k) で保存。
-   - LINE ログイン: LINE OAuth 2.0（profile, openid）。成功時は `st.session_state["auth_user"] = "line:<userId>"` を設定。
-   - 設定方法: 環境変数 `LINE_CLIENT_ID`, `LINE_CLIENT_SECRET`, `LINE_REDIRECT_URI` か、`.streamlit/secrets.toml` の `[line]` に `client_id`, `client_secret`, `redirect_uri`。
+ - 認証: LINE OAuth の最小実装あり（`LINE_CLIENT_ID`/`LINE_CLIENT_SECRET`/`LINE_REDIRECT_URI`）。機能ガードは未適用（ToDo）。
 
 ## テスト/検証（現状）
 - スモークチェック（読み取り中心・破壊なし）
@@ -150,17 +146,91 @@
   - 機密・外部キーはダミー化して提示。
 
 ## 環境・設定メモ
-- ポート: 8501
+- ポート: 5000（Flask） / 8501（旧 Streamlit）
 - タイムゾーン: Asia/Tokyo
 - 主要パッケージ: `pandas`, `altair`, `streamlit`, `sqlite3`, ほか
 - 無効化中の機能: Google Sheets 同期、Gemini 分析
 - データディレクトリ: 既定は `/data`。環境変数 `KAKEIBO_DATA_DIR` で上書き可。`/data` に書込不可の場合は自動でリポジトリ内 `./runtime-data` にフォールバック（CI/サンドボックス向け）。
 
-## 将来の改善候補（軽めのロードマップ）
-- SQL パラメータ化と簡易 DAO 化。
-- `app.py` の軽い分割（`db.py`, `views/*.py` など）。
-- 最低限の e2e/スモークテスト整備（起動/主要 UI）。
-- バックアップ/リストアの UI 連携（Sheets or ファイル）。
+## 将来の改善候補（Flask/UX ToDo）
+- 認証ガード: `/edit` `/dev` `/api/*` にログイン必須（Blueprint + before_request）。
+- CSRF: 変更系 API にトークン導入（ヘッダ or Flask-WTF）。
+- Tabulator のローカル配信（static/vendor）とアセットバンドル。
+- 編集UX: 複数行一括編集/バルク保存、ショートカット、列固定、CSV/TSV入出力。
+- `/api/transactions` サーバーサイドページング/ソート、簡易キャッシュ。
+- 監査ログ: 誰が何をいつ変更したかの記録。
+- 404/500 テンプレートと構造化ロギング。
+
+---
+### Flask 実装の起動（ローカル）
+- 依存インストール: `uv sync` または `pip install -r requirements.txt`
+- 起動: `uv run python flask_app.py`（`http://localhost:5000`）
+- Docker: `docker build -f Dockerfile.flask -t kakeibo-flask .` → `docker run --rm -p 5000:5000 -v $(pwd)/runtime-data:/data kakeibo-flask`
+
+### API（編集用・JSON）
+- GET `/api/transactions`（クエリ: `main_category_id`, `sub_category_id`, `start_date`, `end_date`）
+- POST `/api/transactions`（新規作成）
+- PATCH `/api/transactions/<id>`（部分更新）
+- DELETE `/api/transactions/<id>`（削除）
+ - GET `/api/sub_categories`（クエリ: `main_category_id`, `q` ライブ検索）
+ - POST `/api/sub_categories`（小カテゴリの新規作成）
+ - PATCH `/api/sub_categories/<id>`（小カテゴリの名前・大カテゴリ更新）
+- DELETE `/api/sub_categories/<id>`（小カテゴリ削除・関連取引も削除）
+
+認証ガード
+- `@app.before_request` でガード。未認証時は `/login` へ。
+- API への未認証アクセスは `401 Unauthorized`（JSON）を返す。
+- 例外: `/static/*`, `/login`, `/login/line`, `/callback/line`, `/` は許可。
 
 ---
 この AGENTS.md は「最新の“作業の仕方”」をまとめる場所です。変更がユーザー体験や運用に影響する場合、README と併せて本書も更新してください。
+
+## Flaskアプリケーションへの移行
+
+本プロジェクトは、Streamlitベースの家計簿アプリケーションをFlaskフレームワークに移行しました。これにより、より汎用的なWebアプリケーションとしての利用が可能になります。
+
+### 技術スタックの変更
+- **旧:** Python 3.12 / Streamlit / SQLite
+- **新:** Python 3.12 / Flask / Jinja2 / SQLite / Bootstrap / Custom CSS / JavaScript
+
+### 主要ファイル/ディレクトリの変更
+- `app.py` (Streamlitエントリポイント) から `flask_app.py` (Flaskエントリポイント) へ移行。
+- `kakeibo/pages/` (Streamlitページ) のロジックを `flask_app.py` 内のルーティング関数と `templates/` ディレクトリ内のJinja2テンプレートに再構築。
+- `templates/` ディレクトリを新規作成し、HTMLテンプレートを配置。
+- `static/` ディレクトリを新規作成し、カスタムCSSファイルを配置。
+
+### UI/UXの変更
+- Streamlitの組み込みUIコンポーネントを、HTMLフォーム、Bootstrap、カスタムCSS、JavaScript（動的な要素用）で再実装。
+- Google Fonts (Noto Sans JP) と Material Icons を導入し、UIの視覚的洗練を実施。
+
+### 機能ごとの実装詳細
+- **ホーム (`/`)**: `追加 (/add)` へリダイレクト。
+- **追加 (`/add`)**: 取引データの追加フォーム。大カテゴリ連動の小カテゴリ選択。
+- **編集 (`/edit`)**: 取引データの一覧表示、フィルター機能（大カテゴリ、小カテゴリ、日付範囲、ライブフィルター）。個別の取引の編集 (`/edit/<id>`) および削除 (`/delete/<id>`)。
+- **カテゴリー追加・編集 (`/categories`)**: Tabulator によるスプレッドシート風 UI。インライン編集・行追加・削除・ライブ検索・ページング。従来の個別編集 (`/categories/edit/<id>`) も互換のため残置。
+- **グラフ (`/graphs`)**: 月次収支と累計資産のグラフ表示。AltairでJSONを生成し、Vega-Lite.jsで描画。
+- **開発者オプション (`/dev`)**: データベースファイルのダウンロード (`/download_db`)、任意のSQL実行機能。
+
+### Docker対応
+- Flaskアプリケーション用の`Dockerfile.flask`および`start-flask.sh`を作成し、Dockerでのビルドと実行を可能に。`makefile`にショートカットを追加。
+
+## ToDoリスト（Flask版）
+
+以下の機能はStreamlit版に存在しますが、Flask版では未実装または簡素化されています。
+- **サイドバーからの未入力月額のインタラクティブな追加:** Streamlit版ではサイドバーから直接、未入力の定期取引の金額入力と追加が可能でしたが、Flask版では一覧表示のみで、追加は「追加」ページで行う必要があります。
+- **認証機能:** Streamlit版に存在するDBログイン、LINEログインなどの認証機能は、Flask版では未実装です。
+- **ログアウトボタンの機能:** ログアウトボタンは設置されていますが、機能は未実装です。
+- **Google Sheets/Gemini連携:** Streamlit版でもコメントアウトされていましたが、Flask版でも未実装です。
+
+### フロントエンド資産の構成（指針）
+- JS は基本的に `static/js/` に配置し、テンプレート内のインライン `<script>` は避ける。
+  - ページ固有の JS は `base.html` の `{% block scripts %}` で読み込む（例: `graphs.html` → `graphs.js`）。
+  - サーバー生成のデータは `<script type="application/json" id="...">{...}</script>` に埋め込み、JS 側で `JSON.parse` して利用する。
+- 共通 UI は `templates/partials/` に切り出して `{% include %}` で再利用（例: `partials/sidebar.html`）。
+- CSS は `static/css/` に置き、必要に応じてコンポーネント単位へ分割可。
+
+### 最近のUI/UX更新（要約）
+- サイドバーをオフキャンバス化し、開閉ボタン（`>`/`×`）を追加。ナビゲーションはドロップダウン化。リンククリックで自動クローズ。
+- 「月の選択」と「予算進捗」を全ページ上部のカードに移設（`templates/partials/top_progress.html`）。折りたたみトグル対応（▲/▼）。
+- ルート `/` は `add` にリダイレクト。サイドバーの「ホーム」は `add` を指す。
+- カテゴリー管理を編集ページ同等のスプレッドシート UX に刷新。対応する JSON API を追加（上記参照）。

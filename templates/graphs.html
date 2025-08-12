@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}グラフ - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>グラフ</h1>
+{% endblock %}
+
+{% block content %}
+    <div class="card mb-3">
+        <div class="card-header">期間フィルター</div>
+        <div class="card-body">
+            <form id="rangeForm" method="GET" action="{{ url_for('graphs') }}" class="row g-3 align-items-end">
+                <input type="hidden" name="month" value="{{ selected_month }}" />
+                <div class="col-md-3">
+                    <label for="startMonth" class="form-label">開始月</label>
+                    <select id="startMonth" name="start_month" class="form-select">
+                        {% for m in month_options %}
+                            <option value="{{ m }}" {% if m == selected_start_month %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="endMonth" class="form-label">終了月</label>
+                    <select id="endMonth" name="end_month" class="form-select">
+                        {% for m in month_options %}
+                            <option value="{{ m }}" {% if m == selected_end_month %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">月次収支</div>
+                <div class="card-body">
+                    <div id="monthly_chart"></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">累計資産推移</div>
+                <div class="card-body">
+                    <div id="cumulative_chart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% block scripts %}
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    <script id="monthlyChartData" type="application/json">{{ monthly_chart_json | safe }}</script>
+    <script id="cumulativeChartData" type="application/json">{{ cumulative_chart_json | safe }}</script>
+    <script src="{{ url_for('static', filename='js/graphs.js') }}"></script>
+    {% endblock %}
+{% endblock %}

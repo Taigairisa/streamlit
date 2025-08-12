@@ -1,0 +1,76 @@
+<div class="offcanvas offcanvas-start sidebar" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="sidebarOffcanvasLabel">Kakeibo</h5>
+        <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="閉じる"></button>
+    </div>
+    <div class="offcanvas-body">
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('add', month=selected_month) }}">ホーム</a>
+            </li>
+        </ul>
+
+        <!-- Dropdown menu for main navigation -->
+        <div class="dropdown px-3 mb-3">
+            <button class="btn btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                メニュー
+            </button>
+            <ul class="dropdown-menu w-100">
+                <li><a class="dropdown-item" href="{{ url_for('add', month=selected_month) }}">追加</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('edit', month=selected_month) }}">編集</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('categories', month=selected_month) }}">カテゴリー追加・編集</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('graphs', month=selected_month) }}">グラフ</a></li>
+                <li><a class="dropdown-item" href="{{ url_for('dev_options', month=selected_month) }}">開発者オプション</a></li>
+            </ul>
+        </div>
+
+        
+
+        <h4 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+            <span>贈与見える化</span>
+        </h4>
+        <ul class="nav flex-column mb-2">
+            {% if gift_summary %}
+                {% for item in gift_summary %}
+                    <li class="nav-item">
+                        <span class="d-block px-3 text-muted">{{ item.detail }}: {{ item.return_amount }}円 / {{ item.gift_amount }}円</span>
+                        <div class="progress mx-3" style="height: 5px;">
+                            <div class="progress-bar" role="progressbar" style="width: {{ item.percentage }}%;" aria-valuenow="{{ item.percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li class="nav-item"><span class="d-block px-3 text-muted">贈与に関するデータがありません。</span></li>
+            {% endif %}
+        </ul>
+
+        <h4 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+            <span>未入力の月額</span>
+        </h4>
+        <ul class="nav flex-column mb-2">
+            {% if unentered_amounts %}
+                {% for item in unentered_amounts %}
+                    <li class="nav-item">
+                        <span class="d-block px-3 text-muted">● {{ item.detail }} (前回入力 {{ item.last_date }})</span>
+                    </li>
+                {% endfor %}
+            {% else %}
+                <li class="nav-item"><span class="d-block px-3 text-muted">未入力の月額はありません。</span></li>
+            {% endif %}
+        </ul>
+
+        <hr class="mx-3">
+        <ul class="nav flex-column mb-2">
+            {% if session.get('auth_user') %}
+            <li class="nav-item px-3 text-muted small">ログイン中: {{ session.get('auth_user') }}</li>
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('logout') }}">ログアウト</a>
+            </li>
+            {% else %}
+            <li class="nav-item">
+                <a class="nav-link" href="{{ url_for('login') }}">ログイン</a>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>

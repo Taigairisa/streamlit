@@ -1,0 +1,501 @@
+{% extends 'base.html' %}
+
+{% block title %}データ編集 - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>データ編集</h1>
+{% endblock %}
+
+{% block content %}
+    <link href="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+    <script>
+        function loadScript(src){
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src; s.async = true;
+                s.onload = () => resolve();
+                s.onerror = () => reject(new Error('Failed to load '+src));
+                document.head.appendChild(s);
+            });
+        }
+        async function ensureTabulator(){
+            if (window.Tabulator) return true;
+            const sources = [
+                'https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js',
+                'https://unpkg.com/tabulator-tables/dist/js/tabulator.min.js',
+                '{{ url_for('static', filename='vendor/tabulator/js/tabulator.min.js') }}'
+            ];
+            for (const src of sources){
+                try { await loadScript(src); if (window.Tabulator) return true; } catch(e) {}
+            }
+            return false;
+        }
+    </script>
+
+    <div class="card mb-4">
+        <div class="card-header">フィルター</div>
+        <div class="card-body">
+            <form id="filterForm" method="GET" action="{{ url_for('edit') }}" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="mainCategorySelect" class="form-label">大カテゴリ</label>
+                    <select class="form-select" id="mainCategorySelect" name="main_category_id">
+                        {% for main in main_categories %}
+                            <option value="{{ main[0] }}" {% if main[0] == request.args.get('main_category_id')|int %}selected{% endif %}>{{ main[1] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="subCategorySelect" class="form-label">小カテゴリ</label>
+                    <select class="form-select" id="subCategorySelect" name="sub_category_id">
+                        <!-- Options will be populated by JavaScript -->
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="startDate" class="form-label">開始日</label>
+                    <input type="date" class="form-control" id="startDate" name="start_date" value="{{ request.args.get('start_date', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="endDate" class="form-label">終了日</label>
+                    <input type="date" class="form-control" id="endDate" name="end_date" value="{{ request.args.get('end_date', '') }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="liveFilter" class="form-label">ライブ検索（詳細・種別を含む）</label>
+                    <input type="text" class="form-control" id="liveFilter" placeholder="例: 食費, 収入 など">
+                </div>
+                <div class="col-md-2">
+                    <label for="pageSize" class="form-label">表示件数</label>
+                    <select id="pageSize" class="form-select">
+                        <option value="20">20</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="0">すべて</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="btn-group">
+            <button id="addRowBtn" class="btn btn-sm btn-primary">行を追加</button>
+            <button id="reloadBtn" class="btn btn-sm btn-outline-secondary">再読込</button>
+            <button id="undoBtn" class="btn btn-sm btn-outline-secondary">元に戻す</button>
+            <button id="redoBtn" class="btn btn-sm btn-outline-secondary">やり直す</button>
+        </div>
+        <div><small class="text-muted" id="tableInfo"></small></div>
+    </div>
+    <div id="alertArea"></div>
+    <div id="transactionsGrid"></div>
+
+    <script>
+        const mainCategorySelect = document.getElementById('mainCategorySelect');
+        const subCategorySelect = document.getElementById('subCategorySelect');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        const liveFilterInput = document.getElementById('liveFilter');
+        const pageSizeSelect = document.getElementById('pageSize');
+        const tableInfo = document.getElementById('tableInfo');
+        const gridEl = document.getElementById('transactionsGrid');
+        const addRowBtn = document.getElementById('addRowBtn');
+        const reloadBtn = document.getElementById('reloadBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        const alertArea = document.getElementById('alertArea');
+
+        const allSubCategories = {{ sub_categories | tojson }}; 
+        const selectedSubCategoryId = {{ request.args.get('sub_category_id') | int if request.args.get('sub_category_id') else 'null' }};
+
+        function updateSubCategories() {
+            const selectedMainCategoryId = parseInt(mainCategorySelect.value, 10);
+            subCategorySelect.innerHTML = '';
+            let firstOptionValue = null;
+            let hasSelected = false;
+            allSubCategories.forEach(sub => {
+                if (sub[1] === selectedMainCategoryId) {
+                    const option = document.createElement('option');
+                    option.value = sub[0];
+                    option.textContent = sub[2];
+                    if (firstOptionValue === null) firstOptionValue = String(sub[0]);
+                    if (selectedSubCategoryId && sub[0] === selectedSubCategoryId) {
+                        option.selected = true;
+                        hasSelected = true;
+                    }
+                    subCategorySelect.appendChild(option);
+                }
+            });
+            if (!hasSelected && firstOptionValue !== null) {
+                subCategorySelect.value = firstOptionValue;
+            }
+        }
+
+        function applyFilter() {
+            const url = new URL(window.location.href);
+            const params = new URLSearchParams(url.search);
+            params.set('main_category_id', mainCategorySelect.value);
+            if (subCategorySelect.value) {
+                params.set('sub_category_id', subCategorySelect.value);
+            } else {
+                params.delete('sub_category_id');
+            }
+            if (startDateInput.value) params.set('start_date', startDateInput.value);
+            if (endDateInput.value) params.set('end_date', endDateInput.value);
+            window.location.href = "{{ url_for('edit') }}?" + params.toString();
+        }
+
+        // Sub-category options map for editor
+        const subOptionsByMain = {};
+        for (const [sid, mid, name] of allSubCategories) {
+            if (!subOptionsByMain[mid]) subOptionsByMain[mid] = {};
+            subOptionsByMain[mid][sid] = name;
+        }
+
+        // Spreadsheet-like grid (Tabulator)
+        let table = null;
+        function subEditor(cell, onRendered, success, cancel){
+            const mid = parseInt(mainCategorySelect.value, 10);
+            const values = subOptionsByMain[mid] || {};
+            const select = document.createElement('select');
+            for (const [val, label] of Object.entries(values)){
+                const opt = document.createElement('option');
+                opt.value = val; opt.textContent = label;
+                select.appendChild(opt);
+            }
+            select.value = cell.getValue();
+            const blurHandler = () => success(select.value);
+            select.addEventListener('change', blurHandler);
+            select.addEventListener('blur', blurHandler);
+            onRendered(()=>select.focus());
+            return select;
+        }
+
+        function buildApiUrl(){
+            const url = new URL(`{{ url_for('api_get_transactions') }}`, window.location.origin);
+            if (mainCategorySelect.value) url.searchParams.set('main_category_id', mainCategorySelect.value);
+            if (subCategorySelect.value) url.searchParams.set('sub_category_id', subCategorySelect.value);
+            if (startDateInput.value) url.searchParams.set('start_date', startDateInput.value);
+            if (endDateInput.value) url.searchParams.set('end_date', endDateInput.value);
+            return url.toString();
+        }
+
+        function updateInfo(count){ tableInfo.textContent = `${count} 件表示`; }
+
+        function showAlert(message, type='warning', timeout=3000){
+            alertArea.innerHTML = `<div class="alert alert-${type} py-2" role="alert">${message}</div>`;
+            if (timeout){ setTimeout(()=>{ alertArea.innerHTML=''; }, timeout); }
+        }
+
+        function buildTable(){
+            const pageSize = parseInt(pageSizeSelect.value, 10);
+            table = new Tabulator(gridEl, {
+                layout: 'fitColumns',
+                height: '600px',
+                selectable: true,
+                clipboard: true,
+                clipboardPasteAction: 'insert',
+                history: true,
+                columnDefaults: { headerSort: true },
+                pagination: pageSize > 0 ? 'local' : false,
+                paginationSize: pageSize > 0 ? pageSize : undefined,
+                columns: [
+                    {title:'ID', field:'id', width:60, hozAlign:'right', headerHozAlign:'right', sorter:'number'},
+                    {title:'日付', field:'date', editor:'input', sorter:'datetime', sorterParams:{format:'YYYY-MM-DD'}, validator:[{type:'regex', param:/^\d{4}-\d{2}-\d{2}$/}]},
+                    {title:'詳細', field:'detail', editor:'input', sorter:'string'},
+                    {title:'種別', field:'type', editor:'select', editorParams:{values:{'支出':'支出','収入':'収入','予算':'予算'}}, sorter:'string', validator:[{type:'in', parameters:['支出','収入','予算']}]},
+                    {title:'金額', field:'amount', hozAlign:'right', editor:'number', editorParams:{min:0, step:1}, sorter:'number', mutatorData:(v)=> (v===''||v==null? null : parseInt(v,10)), validator:[{type:'required'},{type:'integer'},{type:'min', parameters:0}], bottomCalc:'sum'},
+                    {title:'小カテゴリ', field:'sub_category_id', editor:subEditor, sorter:'number', validator:[{type:'required'}], mutatorData:(v)=>parseInt(v,10)},
+                    {title:'操作', formatter:()=>'\u003Cbutton class="btn btn-sm btn-danger"\u003E削除\u003C/button\u003E', width:90, cellClick:(e, cell)=>{
+                        const row = cell.getRow(); const data = row.getData();
+                        if (!confirm('本当に削除しますか？')) return;
+                        if (data.id){ fetch(`{{ url_for('api_delete_transaction', transaction_id=0) }}`.replace('/0','/'+data.id), {method:'DELETE'})
+                            .then(()=>row.delete());
+                        } else { row.delete(); }
+                    }}
+                ],
+                ajaxURL: buildApiUrl(),
+                ajaxResponse:(url, params, response)=>{ updateInfo(response.length); return response; },
+                ajaxError:function(error){
+                    showAlert('データの取得に失敗しました。ページを再読込してください。','danger',5000);
+                },
+            });
+
+            function tryCreateRow(row){
+                const data = row.getData();
+                const required = ['sub_category_id','date','type','amount'];
+                if (required.some(k => data[k] === undefined || data[k] === null || String(data[k]).trim()==='')){
+                    showAlert('必須項目（小カテゴリ・日付・種別・金額）を入力してください。');
+                    return;
+                }
+                const summary = `新規作成します:\n`+
+                  `小カテゴリ: ${data.sub_category_id}\n`+
+                  `日付: ${data.date}\n`+
+                  `種別: ${data.type}\n`+
+                  `金額: ${data.amount}\n`+
+                  `詳細: ${data.detail || ''}\n保存してよろしいですか？`;
+                if (!confirm(summary)) return;
+                fetch(`{{ url_for('api_create_transaction') }}`, {
+                    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+                        sub_category_id: data.sub_category_id,
+                        date: data.date,
+                        type: data.type,
+                        amount: data.amount,
+                        detail: data.detail || ''
+                    })
+                }).then(async r=>{ if(!r.ok){ throw new Error(await r.text()); } return r.json(); })
+                  .then(j => { if (j.id){ row.update({id:j.id}); showAlert('保存しました。','success',1500);} })
+                  .catch(err => showAlert('保存に失敗しました: '+err.message,'danger',5000));
+            }
+
+            table.on('cellEdited', function(cell){
+                const row = cell.getRow();
+                const data = row.getData();
+                const field = cell.getField();
+                const newVal = data[field];
+                const oldVal = typeof cell.getOldValue === 'function' ? cell.getOldValue() : undefined;
+                if (oldVal === newVal) return;
+                const col = cell.getColumn();
+                const colTitle = col && col.getDefinition ? (col.getDefinition().title || field) : field;
+                const ok = confirm(`以下を変更します:\n${colTitle}: ${oldVal ?? ''} → ${newVal ?? ''}\n保存してよろしいですか？`);
+                if (!ok){
+                    try { if (typeof cell.restoreOldValue === 'function') cell.restoreOldValue(); else cell.setValue(oldVal, true); } catch(e){}
+                    return;
+                }
+                const payload = {[field]: newVal};
+                if (data.id){
+                    fetch(`{{ url_for('api_update_transaction', transaction_id=0) }}`.replace('/0','/'+data.id),{
+                        method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+                    }).then(r=>{ if(!r.ok){ showAlert('更新に失敗しました','danger'); }});
+                } else {
+                    tryCreateRow(row);
+                }
+            });
+
+            table.on('rowAdded', function(row){
+                // When rows are pasted/inserted without id, try create on the fly
+                const data = row.getData();
+                if (!data.id){ tryCreateRow(row); }
+            });
+        }
+
+        function reloadTable(){ if (table){ table.setData(buildApiUrl()); } }
+
+        addRowBtn.addEventListener('click', function(){
+            const today = new Date().toISOString().slice(0,10);
+            table.addRow({date: today, type: '支出', amount: 0});
+        });
+        reloadBtn.addEventListener('click', reloadTable);
+        undoBtn.addEventListener('click', function(){ if(table){ table.undo(); }});
+        redoBtn.addEventListener('click', function(){ if(table){ table.redo(); }});
+
+        mainCategorySelect.addEventListener('change', () => {
+            updateSubCategories();
+            applyFilter();
+            reloadTable();
+        });
+        subCategorySelect.addEventListener('change', ()=>{ applyFilter(); reloadTable(); });
+        startDateInput.addEventListener('change', ()=>{ applyFilter(); reloadTable(); });
+        endDateInput.addEventListener('change', ()=>{ applyFilter(); reloadTable(); });
+
+        // ---------- Basic fallback grid (no external libs) ----------
+        let basicData = [];
+        let basicSort = {key: 'date', dir: 'desc'};
+        function compareBy(key, a, b){
+            const va = a[key]; const vb = b[key];
+            if (key === 'amount' || key === 'id' || key === 'sub_category_id'){
+                return (parseInt(va||0,10) - parseInt(vb||0,10));
+            }
+            if (key === 'date'){
+                return (new Date(va||'1970-01-01')).getTime() - (new Date(vb||'1970-01-01')).getTime();
+            }
+            return String(va||'').localeCompare(String(vb||''));
+        }
+        function renderBasicTable(data){
+            gridEl.innerHTML = '';
+            const table = document.createElement('table');
+            table.className = 'table table-striped table-sm';
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = [
+                {label:'ID', key:'id'},
+                {label:'日付', key:'date'},
+                {label:'詳細', key:'detail'},
+                {label:'種別', key:'type'},
+                {label:'金額', key:'amount'},
+                {label:'小カテゴリ', key:'sub_category_id'},
+                {label:'操作', key:null},
+            ];
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.textContent = h.label;
+                if (h.key){
+                    th.style.cursor = 'pointer';
+                    th.title = 'クリックでソート';
+                    th.addEventListener('click', ()=>{
+                        if (basicSort.key === h.key){ basicSort.dir = (basicSort.dir === 'asc' ? 'desc' : 'asc'); }
+                        else { basicSort.key = h.key; basicSort.dir = 'asc'; }
+                        renderBasicTable(basicData);
+                    });
+                }
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            const tbody = document.createElement('tbody');
+
+            function makeRow(row){
+                const tr = document.createElement('tr');
+                tr.dataset.id = row.id || '';
+                const cells = [];
+                const idCell = `<td>${row.id || ''}</td>`;
+                const dateCell = `<td><input type="date" class="form-control form-control-sm" value="${row.date||''}"></td>`;
+                const detailCell = `<td><input type="text" class="form-control form-control-sm" value="${row.detail||''}"></td>`;
+                const typeCell = `<td><select class="form-select form-select-sm"><option value="支出">支出</option><option value="収入">収入</option><option value="予算">予算</option></select></td>`;
+                const amountCell = `<td><input type="number" step="1" min="0" class="form-control form-control-sm" value="${row.amount||0}"></td>`;
+                const subSel = document.createElement('select');
+                subSel.className = 'form-select form-select-sm';
+                const mid = parseInt(mainCategorySelect.value,10);
+                const map = subOptionsByMain[mid] || {};
+                for (const [sid,label] of Object.entries(map)){
+                    const opt = document.createElement('option');
+                    opt.value = sid; opt.textContent = label;
+                    subSel.appendChild(opt);
+                }
+                if (row.sub_category_id) subSel.value = String(row.sub_category_id);
+                const subCell = document.createElement('td');
+                subCell.appendChild(subSel);
+                const opCell = document.createElement('td');
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn btn-sm btn-danger'; delBtn.textContent = '削除';
+                opCell.appendChild(delBtn);
+
+                tr.innerHTML = idCell + dateCell + detailCell + typeCell + amountCell;
+                tr.appendChild(subCell);
+                tr.appendChild(opCell);
+
+                // set select for type
+                tr.querySelector('select').value = row.type || '支出';
+
+                function collect(){
+                    const [dateI, detailI, typeS, amountI] = tr.querySelectorAll('input, select');
+                    return {
+                        id: tr.dataset.id ? parseInt(tr.dataset.id,10) : undefined,
+                        date: dateI.value,
+                        detail: detailI.value,
+                        type: typeS.value,
+                        amount: amountI.value ? parseInt(amountI.value,10) : 0,
+                        sub_category_id: subSel.value ? parseInt(subSel.value,10) : undefined,
+                    };
+                }
+
+                function saveNow(target){
+                    const data = collect();
+                    if (!data.sub_category_id || !data.date || !data.type || data.amount === undefined){
+                        showAlert('必須項目（小カテゴリ・日付・種別・金額）を入力してください。');
+                        return;
+                    }
+                    let fieldName = '';
+                    if (target){
+                        if (target.type === 'date') fieldName = '日付';
+                        else if (target.type === 'number') fieldName = '金額';
+                        else if (target.tagName === 'SELECT') fieldName = (target === subSel) ? '小カテゴリ' : '種別';
+                        else fieldName = '詳細';
+                        const prev = target.getAttribute('data-prev-value') || '';
+                        const next = (target.type === 'number') ? String(target.value) : target.value;
+                        if (prev !== next){
+                            const ok = confirm(`以下を変更します:\n${fieldName}: ${prev} → ${next}\n保存してよろしいですか？`);
+                            if (!ok){ target.value = prev; return; }
+                        }
+                    }
+                    if (data.id){
+                        fetch(`{{ url_for('api_update_transaction', transaction_id=0) }}`.replace('/0','/'+data.id),{
+                            method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+                        }).then(r=>{ if(!r.ok) showAlert('更新に失敗しました','danger'); else showAlert('更新しました','success',1200); });
+                    } else {
+                        const summary = `新規作成します:\n`+
+                          `小カテゴリ: ${data.sub_category_id}\n`+
+                          `日付: ${data.date}\n`+
+                          `種別: ${data.type}\n`+
+                          `金額: ${data.amount}\n`+
+                          `詳細: ${data.detail || ''}\n保存してよろしいですか？`;
+                        if (!confirm(summary)) return;
+                        fetch(`{{ url_for('api_create_transaction') }}`,{
+                            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data)
+                        }).then(async r=>{ if(!r.ok){ throw new Error(await r.text()); } return r.json(); })
+                          .then(j=>{ if(j.id){ tr.dataset.id = j.id; tr.firstChild.textContent = j.id; showAlert('保存しました','success',1200);} })
+                          .catch(e=> showAlert('保存に失敗しました: '+e.message,'danger',5000));
+                    }
+                    if (target){ target.setAttribute('data-prev-value', target.value); }
+                }
+
+                // Initialize data-prev-value for inputs/selects
+                const inputs = tr.querySelectorAll('input, select');
+                inputs.forEach(el => el.setAttribute('data-prev-value', el.value));
+                tr.addEventListener('change', (e)=> saveNow(e.target));
+                tr.addEventListener('blur', (e)=>{ if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='SELECT')) saveNow(e.target); }, true);
+                delBtn.addEventListener('click', ()=>{
+                    const id = tr.dataset.id ? parseInt(tr.dataset.id,10) : null;
+                    if (!confirm('本当に削除しますか？')) return;
+                    if (id){ fetch(`{{ url_for('api_delete_transaction', transaction_id=0) }}`.replace('/0','/'+id), {method:'DELETE'}).then(()=> tr.remove()); }
+                    else { tr.remove(); }
+                });
+                return tr;
+            }
+
+            // apply sort
+            const sorted = [...data].sort((a,b)=>{
+                const r = compareBy(basicSort.key, a, b);
+                return basicSort.dir === 'asc' ? r : -r;
+            });
+            for (const row of sorted){ tbody.appendChild(makeRow(row)); }
+            table.appendChild(tbody);
+            gridEl.appendChild(table);
+
+            addRowBtn.onclick = function(){
+                tbody.prepend(makeRow({date: new Date().toISOString().slice(0,10), type:'支出', amount:0}));
+            };
+            reloadBtn.onclick = function(){ reloadBasicTable(); };
+            undoBtn.onclick = function(){}; redoBtn.onclick=function(){}; // no-op
+        }
+
+        function reloadBasicTable(){
+            fetch(buildApiUrl()).then(r=>r.json()).then(data=>{ basicData = data; updateInfo(data.length); renderBasicTable(basicData); })
+                .catch(()=> showAlert('データの取得に失敗しました。','danger',5000));
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // If main_category_id is not in URL, set defaults and apply
+            const params = new URLSearchParams(window.location.search);
+            const hasMain = params.has('main_category_id');
+            if (!hasMain) {
+                if (mainCategorySelect.options.length > 0) {
+                    mainCategorySelect.value = mainCategorySelect.options[0].value;
+                }
+            }
+            updateSubCategories();
+            if (!hasMain) {
+                applyFilter();
+                return;
+            }
+            if (await ensureTabulator()){
+                buildTable();
+                reloadTable();
+            } else {
+                showAlert('Tabulatorが使えないため、簡易表に切り替えます。','warning',6000);
+                reloadBasicTable();
+            }
+            // Live search within current data
+            liveFilterInput.addEventListener('input', function(){
+                const val = this.value.toLowerCase();
+                table.setFilter(function(data){
+                    const concat = `${data.detail||''} ${data.type||''} ${data.amount||''}`.toLowerCase();
+                    return concat.includes(val);
+                });
+            });
+            pageSizeSelect.addEventListener('change', function(){
+                const size = parseInt(this.value,10);
+                if (size > 0){ table.setPageSize(size); reloadTable(); }
+                else { table.setPage(false); }
+            });
+        });
+    </script>
+{% endblock %}

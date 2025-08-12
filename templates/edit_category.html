@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}小カテゴリ名変更 - Kakeibo App{% endblock %}
+
+{% block header %}
+    <h1>小カテゴリ名を変更</h1>
+{% endblock %}
+
+{% block content %}
+    <form method="POST" action="{{ url_for('edit_category', sub_category_id=sub_category.id) }}">
+        <div class="mb-3">
+            <label for="mainCategoryName" class="form-label">大カテゴリ</label>
+            <input type="text" class="form-control" id="mainCategoryName" value="{{ main_category_name }}" readonly>
+        </div>
+        <div class="mb-3">
+            <label for="subCategoryName" class="form-label">小カテゴリ名</label>
+            <input type="text" class="form-control" id="subCategoryName" name="name" value="{{ sub_category.name }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">更新</button>
+        <a href="{{ url_for('categories') }}" class="btn btn-secondary">キャンセル</a>
+    </form>
+{% endblock %}

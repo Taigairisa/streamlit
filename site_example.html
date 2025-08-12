@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家計簿アプリ</title>
+
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Sharp" rel="stylesheet">
+
+    <!-- Chart.js (グラフ描画ライブラリ) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* --- 変数定義 --- */
+        :root {
+            --color-primary: #7380ec;
+            --color-danger: #ff7782;
+            --color-success: #41f1b6;
+            --color-warning: #ffbb55;
+            --color-white: #fff;
+            --color-info-dark: #7d8da1;
+            --color-info-light: #dce1eb;
+            --color-dark: #363949;
+            --color-light: rgba(132, 139, 200, 0.18);
+            --color-primary-variant: #111e88;
+            --color-dark-variant: #677483;
+            --color-background: #f6f6f9;
+
+            --card-border-radius: 2rem;
+            --border-radius-1: 0.4rem;
+            --border-radius-2: 0.8rem;
+            --border-radius-3: 1.2rem;
+
+            --card-padding: 1.8rem;
+            --padding-1: 1.2rem;
+
+            --box-shadow: 0 2rem 3rem var(--color-light);
+        }
+
+        /* --- 基本設定 --- */
+        * {
+            margin: 0;
+            padding: 0;
+            outline: 0;
+            appearance: none;
+            border: 0;
+            text-decoration: none;
+            list-style: none;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 14px;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Noto Sans JP', sans-serif;
+            font-size: 0.88rem;
+            background: var(--color-background);
+            color: var(--color-dark);
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: grid;
+            width: 96%;
+            margin: 0 auto;
+            gap: 1.8rem;
+            grid-template-columns: 1fr 2fr;
+        }
+        
+        h1 { font-size: 1.8rem; font-weight: 700; }
+        h2 { font-size: 1.4rem; font-weight: 700; }
+        h3 { font-size: 0.87rem; font-weight: 500; }
+        h4 { font-size: 0.8rem; }
+        small { font-size: 0.75rem; }
+
+        /* --- 共通スタイル --- */
+        .card {
+            background: var(--color-white);
+            padding: var(--card-padding);
+            border-radius: var(--card-border-radius);
+            box-shadow: var(--box-shadow);
+            transition: all 300ms ease;
+        }
+        .card:hover {
+            box-shadow: none;
+        }
+
+        /* --- メインレイアウト --- */
+        main {
+            padding: 2rem 1.5rem;
+        }
+
+        main h1 {
+            margin-bottom: 1.5rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.6rem;
+            margin-bottom: 2rem;
+        }
+
+        .dashboard > div {
+            background: var(--color-white);
+            padding: var(--card-padding);
+            border-radius: var(--card-border-radius);
+            box-shadow: var(--box-shadow);
+            transition: all 300ms ease;
+        }
+        .dashboard > div:hover {
+            box-shadow: none;
+        }
+        
+        .dashboard .icon {
+            background: var(--color-primary);
+            padding: 0.5rem;
+            border-radius: 50%;
+            color: var(--color-white);
+            font-size: 2rem;
+        }
+        .dashboard .income .icon { background: var(--color-success); }
+        .dashboard .expense .icon { background: var(--color-danger); }
+        
+        .dashboard .middle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 0.5rem 0 1rem;
+        }
+
+        /* --- 入力フォーム --- */
+        .add-transaction {
+            margin-top: 2rem;
+        }
+        .add-transaction h2 {
+            margin-bottom: 0.8rem;
+        }
+        .add-transaction form {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .add-transaction input, .add-transaction select {
+            width: 100%;
+            padding: 0.8rem;
+            border-radius: var(--border-radius-2);
+            background: var(--color-info-light);
+            font-family: inherit;
+        }
+        .add-transaction button {
+            grid-column: 1 / -1;
+            width: 100%;
+            padding: 1rem;
+            background: var(--color-primary);
+            color: var(--color-white);
+            border-radius: var(--border-radius-2);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 300ms ease;
+        }
+        .add-transaction button:hover {
+            background: var(--color-primary-variant);
+        }
+
+        /* --- 右側セクション --- */
+        .right-section {
+            margin-top: 1.4rem;
+        }
+        .right-section h2 {
+            margin-bottom: 0.8rem;
+        }
+
+        /* --- 取引履歴 --- */
+        .recent-transactions table {
+            width: 100%;
+            border-spacing: 0 1rem;
+            text-align: left;
+        }
+        .recent-transactions th {
+            color: var(--color-info-dark);
+            padding-bottom: 0.5rem;
+        }
+        .recent-transactions td {
+            background: var(--color-white);
+            padding: var(--padding-1) var(--card-padding);
+        }
+        .recent-transactions tr:hover td {
+            background: var(--color-info-light);
+        }
+        .recent-transactions td:first-child { border-radius: var(--border-radius-2) 0 0 var(--border-radius-2); }
+        .recent-transactions td:last-child { border-radius: 0 var(--border-radius-2) var(--border-radius-2) 0; }
+        
+        .recent-transactions .income-color { color: var(--color-success); }
+        .recent-transactions .expense-color { color: var(--color-danger); }
+        .recent-transactions .delete-btn {
+            cursor: pointer;
+            color: var(--color-danger);
+            opacity: 0.7;
+        }
+        .recent-transactions .delete-btn:hover { opacity: 1; }
+
+        /* --- 支出分析 --- */
+        .expense-analysis {
+            margin-top: 2rem;
+        }
+        .expense-analysis .chart-container {
+            background: var(--color-white);
+            box-shadow: var(--box-shadow);
+            border-radius: var(--card-border-radius);
+            padding: var(--card-padding);
+            height: 20rem; /* グラフの高さ */
+        }
+
+        /* --- レスポンシブ対応 --- */
+        @media screen and (max-width: 1200px) {
+            .container {
+                width: 94%;
+                grid-template-columns: 1fr;
+            }
+        }
+        @media screen and (max-width: 768px) {
+            .container {
+                width: 100%;
+            }
+            main {
+                padding: 1rem;
+            }
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            .add-transaction form {
+                grid-template-columns: 1fr;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <main>
+            <h1>家計簿ダッシュボード</h1>
+
+            <!-- サマリー表示 -->
+            <div class="dashboard">
+                <div class="balance">
+                    <span class="material-icons-sharp icon">account_balance_wallet</span>
+                    <div class="middle">
+                        <div>
+                            <h3>残高</h3>
+                            <h2 id="balance">¥0</h2>
+                        </div>
+                    </div>
+                    <small class="text-muted">現在の総資産</small>
+                </div>
+                <div class="income">
+                    <span class="material-icons-sharp icon">arrow_upward</span>
+                    <div class="middle">
+                        <div>
+                            <h3>総収入</h3>
+                            <h2 id="total-income">¥0</h2>
+                        </div>
+                    </div>
+                    <small class="text-muted">今月の収入合計</small>
+                </div>
+                <div class="expense">
+                    <span class="material-icons-sharp icon">arrow_downward</span>
+                    <div class="middle">
+                        <div>
+                            <h3>総支出</h3>
+                            <h2 id="total-expense">¥0</h2>
+                        </div>
+                    </div>
+                    <small class="text-muted">今月の支出合計</small>
+                </div>
+            </div>
+
+            <!-- 取引入力フォーム -->
+            <div class="add-transaction card">
+                <h2>新しい取引を追加</h2>
+                <form id="transaction-form">
+                    <select id="type" required>
+                        <option value="income">収入</option>
+                        <option value="expense">支出</option>
+                    </select>
+                    <input type="text" id="description" placeholder="内容 (例: 給料, 食費)" required>
+                    <input type="number" id="amount" placeholder="金額" required min="1">
+                    <input type="date" id="date" required>
+                    <button type="submit">取引を追加</button>
+                </form>
+            </div>
+        </main>
+
+        <div class="right-section">
+            <!-- 取引履歴 -->
+            <div class="recent-transactions">
+                <h2>取引履歴</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>内容</th>
+                            <th>日付</th>
+                            <th>金額</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="transaction-list">
+                        <!-- ここに取引が動的に追加されます -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 支出分析グラフ -->
+            <div class="expense-analysis">
+                <h2>支出カテゴリ分析</h2>
+                <div class="chart-container">
+                    <canvas id="expense-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM要素の取得 ---
+        const balanceEl = document.getElementById('balance');
+        const totalIncomeEl = document.getElementById('total-income');
+        const totalExpenseEl = document.getElementById('total-expense');
+        const transactionListEl = document.getElementById('transaction-list');
+        const form = document.getElementById('transaction-form');
+        const typeEl = document.getElementById('type');
+        const descriptionEl = document.getElementById('description');
+        const amountEl = document.getElementById('amount');
+        const dateEl = document.getElementById('date');
+        const ctx = document.getElementById('expense-chart').getContext('2d');
+
+        // --- データ管理 ---
+        // localStorageからデータを読み込むか、サンプルデータで初期化
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [
+            { id: 1, type: 'income', description: '給料', amount: 250000, date: '2025-08-10' },
+            { id: 2, type: 'expense', description: '家賃', amount: 70000, date: '2025-08-01' },
+            { id: 3, type: 'expense', description: '食費', amount: 45000, date: '2025-08-05' },
+            { id: 4, type: 'expense', description: '光熱費', amount: 15000, date: '2025-08-08' }
+        ];
+
+        let expenseChart; // グラフのインスタンスを保持する変数
+
+        // --- 関数定義 ---
+
+        /**
+         * 取引データをlocalStorageに保存する
+         */
+        function saveTransactions() {
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+        }
+
+        /**
+         * 取引をリストに追加する
+         * @param {object} transaction - 取引オブジェクト
+         */
+        function addTransactionDOM(transaction) {
+            const item = document.createElement('tr');
+            const isExpense = transaction.type === 'expense';
+            const sign = isExpense ? '-' : '+';
+            const amountColorClass = isExpense ? 'expense-color' : 'income-color';
+
+            item.innerHTML = `
+                <td>${transaction.description}</td>
+                <td>${transaction.date}</td>
+                <td class="${amountColorClass}">${sign} ¥${transaction.amount.toLocaleString()}</td>
+                <td><span class="material-icons-sharp delete-btn" onclick="removeTransaction(${transaction.id})">delete</span></td>
+            `;
+            transactionListEl.appendChild(item);
+        }
+
+        /**
+         * ダッシュボードの数値を更新する
+         */
+        function updateDashboard() {
+            const amounts = transactions.map(t => t.amount);
+            
+            const totalIncome = amounts
+                .filter((_, i) => transactions[i].type === 'income')
+                .reduce((acc, item) => (acc += item), 0);
+            
+            const totalExpense = amounts
+                .filter((_, i) => transactions[i].type === 'expense')
+                .reduce((acc, item) => (acc += item), 0);
+
+            const balance = totalIncome - totalExpense;
+
+            balanceEl.innerText = `¥${balance.toLocaleString()}`;
+            totalIncomeEl.innerText = `¥${totalIncome.toLocaleString()}`;
+            totalExpenseEl.innerText = `¥${totalExpense.toLocaleString()}`;
+        }
+        
+        /**
+         * 支出カテゴリの円グラフを更新する
+         */
+        function updateChart() {
+            const expenseTransactions = transactions.filter(t => t.type === 'expense');
+            // カテゴリごとの合計を計算
+            const expenseByCategory = expenseTransactions.reduce((acc, transaction) => {
+                const category = transaction.description;
+                if (!acc[category]) {
+                    acc[category] = 0;
+                }
+                acc[category] += transaction.amount;
+                return acc;
+            }, {});
+
+            const labels = Object.keys(expenseByCategory);
+            const data = Object.values(expenseByCategory);
+
+            // Chart.jsのインスタンスが既にあれば破棄する
+            if (expenseChart) {
+                expenseChart.destroy();
+            }
+
+            // 新しいグラフを描画
+            expenseChart = new Chart(ctx, {
+                type: 'doughnut', // ドーナツグラフ
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '支出',
+                        data: data,
+                        backgroundColor: [
+                            '#ff7782', '#ffbb55', '#7380ec', '#41f1b6', 
+                            '#363949', '#7d8da1', '#111e88', '#677483'
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        }
+                    }
+                }
+            });
+        }
+
+        /**
+         * 新しい取引を追加する処理
+         * @param {Event} e - フォームのsubmitイベント
+         */
+        function addTransaction(e) {
+            e.preventDefault();
+
+            if (typeEl.value.trim() === '' || descriptionEl.value.trim() === '' || amountEl.value.trim() === '' || dateEl.value.trim() === '') {
+                alert('すべての項目を入力してください。');
+                return;
+            }
+
+            const transaction = {
+                id: generateID(),
+                type: typeEl.value,
+                description: descriptionEl.value,
+                amount: +amountEl.value, // 文字列を数値に変換
+                date: dateEl.value
+            };
+
+            transactions.push(transaction);
+            saveTransactions();
+            init(); // UIを再描画
+            form.reset(); // フォームをリセット
+        }
+
+        /**
+         * ユニークなIDを生成する
+         */
+        function generateID() {
+            return Math.floor(Math.random() * 100000000);
+        }
+
+        /**
+         * 取引を削除する
+         * @param {number} id - 削除する取引のID
+         */
+        window.removeTransaction = function(id) {
+            transactions = transactions.filter(t => t.id !== id);
+            saveTransactions();
+            init();
+        }
+
+        /**
+         * アプリケーションを初期化する
+         */
+        function init() {
+            transactionListEl.innerHTML = '';
+            transactions.forEach(addTransactionDOM);
+            updateDashboard();
+            updateChart();
+        }
+
+        // --- イベントリスナー ---
+        form.addEventListener('submit', addTransaction);
+
+        // --- 初期化処理の実行 ---
+        init();
+    </script>
+</body>
+</html>

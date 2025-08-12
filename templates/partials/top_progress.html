@@ -1,0 +1,35 @@
+<div class="card mb-3" id="topProgressCard">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-3">
+      <strong>月の選択</strong>
+      <select class="form-select form-select-sm" id="monthSelect">
+        {% for month_option in months %}
+          <option value="{{ month_option }}" {% if month_option == selected_month %}selected{% endif %}>{{ month_option }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#topProgressCollapse" aria-expanded="true" aria-controls="topProgressCollapse" id="topProgressToggle">
+      ▲
+    </button>
+  </div>
+  <div id="topProgressCollapse" class="collapse show">
+    <div class="card-body">
+      {% if budget_progress %}
+        {% for item in budget_progress %}
+          <div class="mb-3">
+            <div class="d-flex justify-content-between">
+              <strong>{{ item.category }}</strong>
+              <span class="text-muted">{{ item.spent }}円 / {{ item.budget }}円</span>
+            </div>
+            <div class="progress" style="height: 8px;">
+              <div class="progress-bar" role="progressbar" style="width: {{ item.percentage }}%;" aria-valuenow="{{ item.percentage }}" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted mb-0">予算進捗を表示するデータがありません。</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
