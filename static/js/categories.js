@@ -44,8 +44,17 @@ document.addEventListener('DOMContentLoaded', function () {
     '#f59e0b': 'Amber',
   };
   const ICON_PRESETS = {
-    '💡': '電気/光熱', '🍔': '外食', '🛒': '食料品', '🚃': '交通', '🚗': '自動車', '🏠': '住居', '📱': '通信', '🏥': '医療', '🎉': '娯楽', '🧾': '税金', '💳': 'カード', '📦': '通販', '🧺': '日用品', '🍽️': '食事', '🍼': '育児', '💼': '仕事', '🏫': '教育', '🐾': 'ペット', '🎁': '贈与'
+    '💡': '電気/光熱','🍔': '外食','🛒': '食料品','🚃': '交通','🚗': '自動車','🏠': '住居','📱': '通信','🏥': '医療','🎉': '娯楽','🧾': '税金','💳': 'カード','📦': '通販','🧺': '日用品','🍽️': '食事','🍼': '育児','💼': '仕事','🏫': '教育','🐾': 'ペット','🎁': '贈与',
+    '💰': '貯金','🧠': '学習','🏃': '運動','🧘': '健康','⚽': 'スポーツ','🎮': 'ゲーム','🎬': '映画','🎧': '音楽','📚': '書籍','✈️': '旅行','🧳': '旅費','⛽': 'ガソリン','🪑': '家具','🖥️': '家電','🥗': 'サラダ','🍣': '寿司','🍺': 'ビール','🍷': 'ワイン','☕': 'コーヒー','🍞': 'パン','🍰': 'スイーツ','💊': '薬','🧧': '祝儀','🐶': '犬','🐱': '猫','🧴':'化粧品','🧹':'掃除','🧽':'消耗品','🏖️':'レジャー','🚌':'バス','🚕':'タクシー','🚲':'自転車','🛏️':'寝具','🔧':'修理','🗂️':'サブスク'
   };
+
+  // List editor item formatter helpers (for Tabulator 'list' editor)
+  function colorItemFormatter(value, text){
+    return `<span class="swatch-dot" style="background:${value}"></span>`;
+  }
+  function iconItemFormatter(value, text){
+    return `<span style="font-size:1.1rem; line-height:1;">${value}</span>`;
+  }
 
   // Custom editors to show swatches/icons instead of text list
   function colorEditor(cell, onRendered, success, cancel){
@@ -108,13 +117,13 @@ document.addEventListener('DOMContentLoaded', function () {
           },
         },
         { title: '小カテゴリ名', field: 'name', editor: 'input', minWidth: 160 },
-        { title: '色', field: 'color', editor: colorEditor, minWidth: 140,
+        { title: '色', field: 'color', editor: 'list', editorParams: { values: COLOR_PRESETS, itemFormatter: colorItemFormatter, listItemFormatter: colorItemFormatter }, minWidth: 140,
           formatter: function (cell) {
             const v = cell.getValue() || '#64748b';
             return `<span class="swatch-dot" style="background:${v}"></span>`;
           }
         },
-        { title: 'アイコン', field: 'icon', editor: iconEditor, minWidth: 120,
+        { title: 'アイコン', field: 'icon', editor: 'list', editorParams: { values: ICON_PRESETS, itemFormatter: iconItemFormatter, listItemFormatter: iconItemFormatter }, minWidth: 120,
           formatter: function (cell) {
             const v = cell.getValue() || '💡';
             return `<span style="font-size:1rem;">${v}</span>`;
