@@ -36,3 +36,12 @@ docker-ps:
 	docker ps
 docker-stop-flask:
 	docker stop kakeibo-flask-app && docker rm kakeibo-flask-app 
+
+# BuildKit OFF (legacy builder)
+docker-build-flask-legacy:
+	DOCKER_BUILDKIT=0 docker build -t kakeibo-flask -f Dockerfile.flask .
+
+# Clean build: prune builder cache and build without cache
+docker-build-flask-clean:
+	-@docker builder prune -af >/dev/null 2>&1 || true
+	docker build --no-cache -t kakeibo-flask -f Dockerfile.flask .
