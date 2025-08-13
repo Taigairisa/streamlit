@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function(){
   if (!tbl) return;
 
   const tbody = tbl.querySelector('tbody');
-  tbl.addEventListener('touchstart', (e) => { e.preventDefault(); });
+  
   const alertArea = document.getElementById('alertArea');
   const tableInfo = document.getElementById('tableInfo');
   const addBtn = document.getElementById('addRowBtn');

@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   const tbl = document.getElementById('categoriesTable');
   const tbody = tbl.querySelector('tbody');
-  tbl.addEventListener('touchstart', (e) => { e.preventDefault(); });
+  
   const mainSel = document.getElementById('catMainSelect');
   const liveFilter = document.getElementById('catLiveFilter');
   const infoEl = document.getElementById('catTableInfo');

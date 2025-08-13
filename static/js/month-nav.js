@@ -11,6 +11,21 @@ function gotoMonth(offset) {
   const nextYm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   url.searchParams.set(paramName, nextYm);
   location.href = url.toString();
+  // After navigation, the page will reload, and updateMonthNavButtons will be called on DOMContentLoaded
+  // So no need to call it here directly after location.href
+}
+
+function updateMonthNavButtons() {
+  const today = new Date();
+  const currentYm = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const displayedYm = document.body.dataset.currentYm;
+
+  const mNextBtn = document.getElementById('mNext');
+  if (mNextBtn) {
+    mNextBtn.disabled = (displayedYm === currentYm);
+  }
+  // mPrev button is not requested to be disabled for earliest month,
+  // and current implementation allows infinite backward navigation.
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -26,5 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     { passive: true }
   );
+
+  updateMonthNavButtons(); // Call on initial load
 });
 
