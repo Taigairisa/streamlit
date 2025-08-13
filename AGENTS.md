@@ -240,3 +240,12 @@
 - 「月の選択」と「予算進捗」を全ページ上部のカードに移設（`templates/partials/top_progress.html`）。折りたたみトグル対応（▲/▼）。
 - ルート `/` は `add` にリダイレクト。サイドバーの「ホーム」は `add` を指す。
 - カテゴリー管理を編集ページ同等のスプレッドシート UX に刷新。対応する JSON API を追加（上記参照）。
+
+### 2025-08-13 TASK-001（UI）
+- 追加: stickyな月次ヘッダーを導入（左右月移動ボタン＋スワイプ対応）。
+- 表示: 残額、予測着地、日割り許容額、進捗バーを表示。
+- 実装:
+  - サーバ: `utils/budget.py` に `month_context()` を追加。`flask_app.get_sidebar_data()` で当月の合計予算/支出を集計し、`month_ctx` としてテンプレへ提供。
+  - テンプレ: `templates/partials/month_header.html` を新設し、`base.html` 先頭にインクルード。
+  - JS: `static/js/month-nav.js` で `month` クエリに基づく前後月遷移とモバイルスワイプを実装。
+- 備考: URLパラメータは既存仕様に合わせ `month=YYYY-MM` を維持。進捗バーは最大100%で安全に丸め。月移動ボタンは「前の月へ」「次の月へ」と明示テキストに変更し、44px最小タップ領域を確保。

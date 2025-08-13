@@ -1,0 +1,21 @@
+<header class="month-header" aria-label="月間サマリー">
+  <div class="d-flex align-items-center justify-content-between mb-2">
+    <button id="mPrev" class="btn btn-outline-secondary nav-btn" aria-label="前の月へ">前の月へ</button>
+    <div id="monthLabel" class="fw-bold">{{ month_label }}</div>
+    <button id="mNext" class="btn btn-outline-secondary nav-btn" aria-label="次の月へ">次の月へ</button>
+  </div>
+
+  <div class="budget-row">
+    <div class="bar mb-1" aria-hidden="true"><span id="barFill" style="width: {{ month_ctx.progress_pct }}%"></span></div>
+    <div class="meta small text-muted" aria-live="polite">
+      残額: ¥{{ "{:,.0f}".format(total_budget - total_spent) }} / 予測着地: ¥{{ "{:,.0f}".format(month_ctx.forecast) }} / 1日許容: ¥{{ "{:,.0f}".format(month_ctx.per_day) }}
+    </div>
+  </div>
+</header>
+<style>
+  .month-header{position:sticky;top:0;background:#fff;z-index:20;box-shadow:0 1px 0 rgba(0,0,0,.06);padding:.5rem .25rem}
+  .bar{height:8px;background:#eee;border-radius:9999px;overflow:hidden}
+  #barFill{display:block;height:100%;background:#2563eb;transition:width .25s ease}
+  .budget-row{display:grid;gap:.25rem}
+  .nav-btn{min-height:44px; padding:.375rem .75rem; font-weight:500}
+</style>

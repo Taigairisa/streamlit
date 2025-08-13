@@ -27,6 +27,7 @@ from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 import pytz
 # Note: Heavy libs (pandas, altair) are imported lazily in routes that need them
+from utils.budget import month_context
 
 app = Flask(__name__)
 # Minimal secret key for session (override via env in production)
@@ -107,6 +108,23 @@ def get_sidebar_data(selected_month=None):
             'percentage': percentage
         })
 
+    # Totals for month header
+    total_spent = int(sum(spent.to_dict().values())) if hasattr(spent, 'to_dict') else int(sum(spent.values())) if isinstance(spent, dict) else 0
+    total_budget = int(sum(budget.to_dict().values())) if hasattr(budget, 'to_dict') else int(sum(budget.values())) if isinstance(budget, dict) else 0
+    # Determine a reference date for the selected month
+    try:
+        sel_year, sel_month = map(int, selected_month.split("-"))
+        now = datetime.now(pytz.timezone('Asia/Tokyo')).date()
+        if now.year == sel_year and now.month == sel_month:
+            ref_date = now
+        else:
+            # Use last day of the selected month for completed months
+            d = date(sel_year, sel_month, 28)
+            ref_date = d + relativedelta(day=31)
+    except Exception:
+        ref_date = datetime.now(pytz.timezone('Asia/Tokyo')).date()
+    month_ctx = month_context(total_budget, total_spent, ref_date)
+
     # Gift visualization
     gifts_df = get_gifts_summary(aid)
     gift_summary = []
@@ -141,6 +159,10 @@ def get_sidebar_data(selected_month=None):
         'months': months,
         'selected_month': selected_month,
         'budget_progress': budget_progress,
+        'month_label': selected_month,
+        'total_budget': total_budget,
+        'total_spent': total_spent,
+        'month_ctx': month_ctx,
         'gift_summary': gift_summary,
         'unentered_amounts': unentered_amounts
     }
