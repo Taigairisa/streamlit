@@ -248,7 +248,7 @@
 
 ---
 
-## TASK-005: 合言葉の“QR招待＋権限＋更新通知（SSE）”を追加
+<!-- ## TASK-005: 合言葉の“QR招待＋権限＋更新通知（SSE）”を追加
 
 **目的**  
 - 共同家計の導入摩擦を最小化し、リアルタイム性で放置を防ぐ。
@@ -332,7 +332,500 @@
 **テスト**  
 - 招待TTL切れ、同一トークンの再利用、権限違反操作のブロック。  
 - オフライン/再接続時のSSE復帰。  
-- QRの誤読（無効トークン）の例外表示。
+- QRの誤読（無効トークン）の例外表示。 -->
+
+## TASK-006: 「自分の前回追加以降」に他ユーザーが追加した明細を表示
+
+**目的**
+- 自分が最後に記帳してからの“他人の追加”を一目で把握し、家計の同期コストを下げる。
+- 通知を重くしない（差分ポーリング、最近5件限定）。
+
+
+### 1) スキーマ & インデックス
+**やること**
+- 既存 `entries` テーブルを対象（前提: 自動採番 `id`, `household_id`, `user_id`, `created_at`）。
+- 高速化のための複合インデックスを追加。
+
+**SQL**
+```sql
+CREATE INDEX IF NOT EXISTS idx_entries_household_user_id
+ON entries(household_id, user_id, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_entries_household_id
+ON entries(household_id, id DESC);
+```
+
+> `id` が全体で単調増加なら「以降」は `id > last_my_id` でOK。  
+> `created_at` を使う場合は `... AND created_at > ?` でも可（ただし索引設計が増える）。
+
+
+### 2) サーバAPI：`GET /api/entries/others_since_my_last?limit=5&scope=month|all`
+**仕様**
+- カレント世帯（`current_user.household_id`）内で、
+  - **自分の最新登録ID**（`last_my_id`）を計算
+  - **他ユーザーの `id > last_my_id`** の明細を取得（降順、最大 `limit` 件）
+- `scope=month` のときは**当月内**に限定（既定: `month` 推奨）。
+
+**Flask（擬似コード）**
+```python
+from flask import request, jsonify
+from flask_login import login_required, current_user
+from datetime import date
+
+@app.get("/api/entries/others_since_my_last")
+@login_required
+def others_since_my_last():
+    limit = min(request.args.get("limit", type=int, default=5), 20)
+    scope = request.args.get("scope", default="month")
+    hh = current_user.household_id
+    me = current_user.id
+
+    # 1) 自分の最新ID（必要なら当月に限定）
+    params = [hh, me]
+    cond = "WHERE household_id=? AND user_id=?"
+    if scope == "month":
+        ym = request.args.get("m")  # 'YYYY-MM'
+        if not ym:
+            today = date.today()
+            ym = f"{today.year}-{today.month:02d}"
+        cond += " AND strftime('%Y-%m', created_at)=?"
+        params.append(ym)
+    last_my_id = (db.fetchone(f"SELECT COALESCE(MAX(id),0) AS id FROM entries {cond}", tuple(params))["id"])
+
+    # 2) 他ユーザーの last_my_id 以降
+    q = """
+      SELECT e.id, e.amount, e.memo, e.created_at,
+             c.name AS category, u.display_name AS author
+      FROM entries e
+      JOIN users u ON u.id = e.user_id
+      LEFT JOIN categories c ON c.id = e.category_id
+      WHERE e.household_id = ?
+        AND e.user_id <> ?
+        AND e.id > ?
+    """
+    p = [hh, me, last_my_id]
+    if scope == "month":
+        q += " AND strftime('%Y-%m', e.created_at)=?"
+        p.append(ym)
+    q += " ORDER BY e.id DESC LIMIT ?"
+    p.append(limit)
+
+    items = db.fetchall(q, tuple(p))
+
+    # カウントだけ欲しい場面用
+    count_q = "SELECT COUNT(1) AS cnt FROM (" + q.replace("SELECT e.id, e.amount, e.memo, e.created_at, c.name AS category, u.display_name AS author", "SELECT 1") + ")"
+    cnt = db.fetchone(count_q, tuple(p))["cnt"]
+
+    return jsonify({
+      "since_my_id": last_my_id,
+      "scope": scope,
+      "count": cnt,
+      "items": items
+    })
+```
+
+**エッジケース**
+- 自分の登録が一度も無い → `last_my_id = 0` として他人の最近5件を返す。
+- 当月に自分の登録が無い（`scope=month`）→ メッセージ「当月は未登録です（前回: YYYY-MM-DD）」をUIで補足。
+
+
+### 3) フロントUI（ドロップダウン＋バナー）
+**やること**
+- 通知ベル内に「**自分の前回追加以降**」タブを追加（既存 NOTIFY-LITE と並置）。
+- 一覧画面の先頭に**薄いバナー**：「前回登録以降に他の人が *N* 件追加 → 詳細」。
+- 非可視時は停止、可視時のみ**45秒おき**に更新（NOTIFY-LITEと同じリズム）。
+
+**HTML（例）**
+```html
+<div class="since-banner" id="sinceBanner" hidden>
+  前回のあなたの登録以降に <b id="sinceCount">0</b> 件追加されています。
+  <button id="sinceOpen">詳細</button>
+</div>
+
+<div id="sinceMenu" class="menu" hidden></div>
+```
+
+**CSS（例）**
+```css
+.since-banner{margin:.5rem 0;padding:.5rem .75rem;background:#f1f5f9;border:1px solid #e5e7eb;border-radius:.5rem}
+#sinceMenu .item{display:grid;grid-template-columns:1fr auto;gap:.25rem;padding:.5rem;border-radius:.5rem}
+#sinceMenu .item:hover{background:#f8fafc}
+#sinceMenu time{color:#64748b;font-size:12px}
+```
+
+**JS（差分ポーリング）**
+```js
+async function fetchOthersSinceMyLast(scope='month', limit=5){
+  const url = `/api/entries/others_since_my_last?scope=${scope}&limit=${limit}${window.currentYm ? '&m='+window.currentYm : ''}`;
+  const res = await fetch(url, {cache:'no-store'});
+  if(!res.ok) return;
+  const data = await res.json();
+  renderSince(data);
+}
+
+function renderSince(data){
+  const banner = document.getElementById('sinceBanner');
+  const countEl = document.getElementById('sinceCount');
+  const menu = document.getElementById('sinceMenu');
+
+  countEl.textContent = data.count;
+  banner.hidden = data.count === 0;
+
+  menu.innerHTML = data.items.map(it=>`
+    <div class="item">
+      <div>
+        <b>${escapeHtml(it.author)}</b> が <b>${escapeHtml(it.category||'未分類')}</b> を登録：¥${Number(it.amount).toLocaleString('ja-JP')}
+        <div class="memo">${escapeHtml(it.memo||'')}</div>
+      </div>
+      <time>${timeAgo(it.created_at)}</time>
+    </div>
+  `).join('') || '<div class="item">新しい追加はありません</div>';
+}
+
+document.getElementById('sinceOpen').addEventListener('click', ()=>{
+  const m = document.getElementById('sinceMenu');
+  m.hidden = !m.hidden;
+});
+
+let sinceTimer;
+function scheduleSince(ms=45000){
+  clearInterval(sinceTimer);
+  sinceTimer = setInterval(()=>{ if(!document.hidden) fetchOthersSinceMyLast(); }, ms);
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) fetchOthersSinceMyLast(); });
+
+fetchOthersSinceMyLast();
+scheduleSince();
+```
+
+
+### 4) 受け入れ基準（AC）
+- 一覧上部のバナーに **件数** が出る（0件なら非表示）。
+- メニューで **最大5件** が時系列降順で表示され、**著者名・カテゴリ・金額・メモ・相対時刻** が見える。
+- 当月スコープで月切替すると、APIも切り替わる（`m=YYYY-MM`）。
+- パフォーマンス：可視時45秒/1リクエスト、**非可視時0**。レスポンスは ~数ms〜十数msで返る（索引使用）。
+
+
+### 5) テスト
+- 自分が**直前に登録**→ 別ユーザーが登録 → 45秒以内に件数が増える。
+- 自分登録が**当月にない**→ バナーに補足文 or 非表示（仕様選択）。
+- 大量データ（10万行）でもAPIの実行計画に `idx_entries_household_user_id` が使われることを確認。
+- 時刻/IDの境界：**同一秒**に複数登録されても `id` 基準で正しく計上。
+
+
+### 6) オプション（将来）
+- **“既読化”**の概念を足す：メニューを開いたら `last_ack_others_id = max(id)` をユーザー設定に保存し、「未読」バッジをより厳密に。
+- **スレッド表示**：同一ユーザーの連続登録を1アイテムに折りたたみ（`+N件`）。
+
+
+#### 補足（なぜ“自分の最後のID”基準？）
+- サーバ側で毎回 **`MAX(id)` を1回** 取るだけで閾値が決まる → 計算が軽い  
+- “自分が最後に触った時刻”を勝手に保存しなくてよい（UXが明快）  
+- 競合や遅延があっても **順序はIDが保証**（AUTOINCREMENT）  
+
+---
+
+## TASK-007: モーション＆マイクロインタラクションの品位向上（Flask単体）
+
+**目的**
+- 認知負荷を下げ、操作の因果を“自然に理解”できる微小アニメーションを付与して**知覚品質**を底上げする。
+- 体感速度を落とさず（むしろ上げて）、**A11y（prefers-reduced-motion）**に完全準拠。
+
+**範囲**
+- Flask + Jinja2 + 素のCSS/JS（必要ならCDN）。SPA化不要。
+
+
+### 成果物（Deliverables）
+1. **モーション設計トークン**（CSSカスタムプロパティ：時間/距離/イージング）
+2. **コンポーネント別モーション**  
+   - モーダル/ドロワーの `fade + slide-up (200ms)`  
+   - 追加直後の**行ハイライト（pulse 1s）**  
+   - 進捗バー（widthトランジション 0.5s）  
+   - トースト通知（enter/exit 200ms + 自動閉）  
+   - スケルトン（500ms以上で自動表示、shimmer）  
+   - ボタン押下の**微スケール**（押下感フィードバック）
+3. **JSユーティリティ**（class付替え/トーストAPI/Reduced Motion尊重）
+4. **A11y適合**（`prefers-reduced-motion: reduce` 時はアニメ最小化、focus可視、aria適用）
+
+
+### 実装（CSS：`static/css/motion.css`）
+```css
+/* === Motion Tokens === */
+:root{
+  --dur-quick: 150ms;
+  --dur-base:  200ms;
+  --dur-slow:  300ms;
+  --e-out:     cubic-bezier(.2,.8,.2,1);
+  --e-in:      cubic-bezier(.4,0,1,1);
+  --e-inout:   cubic-bezier(.4,0,.2,1);
+  --e-bounce:  cubic-bezier(.34,1.56,.64,1);
+  --e-smooth:  cubic-bezier(.22,.61,.36,1);
+  --e-emph:    cubic-bezier(.12,.8,.22,1);
+}
+
+/* Reduced Motion: minimize but keep state clarity */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* === Modal/Drawer === */
+.modal-backdrop{
+  position: fixed; inset: 0; background: rgba(15,23,42,.45);
+  opacity: 0; transition: opacity var(--dur-base) var(--e-out);
+}
+.modal-panel{
+  transform: translateY(16px) scale(.98); opacity: 0;
+  transition: transform var(--dur-base) var(--e-out),
+              opacity var(--dur-base) var(--e-out);
+  will-change: transform, opacity;
+}
+.modal-open .modal-backdrop{ opacity: 1; }
+.modal-open .modal-panel{ transform: translateY(0) scale(1); opacity: 1; }
+
+/* === List add pulse === */
+.pulse{ animation: pulse-bg 1000ms var(--e-smooth); }
+@keyframes pulse-bg{
+  0%{ background: #fffbe6; }
+  100%{ background: transparent; }
+}
+
+/* === Progress bar smooth === */
+.progress{ height:8px; background:#e5e7eb; border-radius:9999px; overflow:hidden; }
+.progress > span{
+  display:block; height:100%; width:0;
+  background:#2563eb; transition: width .5s var(--e-out);
+}
+
+/* === Toast === */
+.toast-host{ position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  display:grid; gap:.5rem; z-index: 70; }
+.toast{
+  min-width: 240px; max-width: 520px; padding:.75rem 1rem;
+  background:#111827; color:#fff; border-radius:.75rem;
+  box-shadow:0 8px 24px rgba(0,0,0,.22);
+  transform: translateY(8px); opacity: 0;
+  transition: transform var(--dur-base) var(--e-out),
+              opacity var(--dur-base) var(--e-out);
+}
+.toast.show{ transform: translateY(0); opacity: 1; }
+.toast .actions{ display:flex; gap:.5rem; margin-top:.25rem; }
+.toast button{ color:#93c5fd; border:0; background:none; padding:.25rem .5rem; border-radius:.5rem; }
+.toast button:hover{ background: rgba(255,255,255,.08); }
+
+/* === Skeleton === */
+.skel{ position:relative; overflow:hidden; background:#f1f5f9; border-radius:.5rem; }
+.skel::after{
+  content:""; position:absolute; inset:0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+  animation: shimmer 1200ms infinite;
+}
+@keyframes shimmer{ 100%{ transform: translateX(100%); } }
+
+/* === Button press micro-scale === */
+.btn{ transition: transform var(--dur-quick) var(--e-out), box-shadow var(--dur-quick) var(--e-out); }
+.btn:active{ transform: scale(.98); }
+.btn:focus-visible{ outline: 3px solid #93c5fd; outline-offset: 2px; }
+```
+
+
+### 実装（JS：`static/js/motion.js`）
+```js
+// Modal open/close helpers (aria + focus trap minimal)
+export function openModal(id){
+  const root = document.getElementById(id);
+  if(!root) return;
+  root.classList.add('modal-open');
+  root.removeAttribute('hidden');
+  const panel = root.querySelector('.modal-panel');
+  const prev = document.activeElement;
+  root.dataset.prevFocus = prev && prev.id ? prev.id : '';
+  const first = panel.querySelector('[tabindex],button,input,select,textarea,a[href]');
+  (first||panel).focus();
+  document.body.style.overflow = 'hidden';
+}
+export function closeModal(id){
+  const root = document.getElementById(id);
+  if(!root) return;
+  root.classList.remove('modal-open');
+  // wait for transition end (~200ms) then hide
+  setTimeout(()=>{
+    root.setAttribute('hidden','');
+    document.body.style.overflow = '';
+    const prevId = root.dataset.prevFocus;
+    if(prevId){ document.getElementById(prevId)?.focus(); }
+  }, 200);
+}
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape'){
+    document.querySelectorAll('.modal-root:not([hidden])')
+      .forEach(el => closeModal(el.id));
+  }
+});
+
+// Toast API
+const hostId = 'toastHost';
+function ensureHost(){
+  let h = document.getElementById(hostId);
+  if(!h){
+    h = document.createElement('div'); h.id = hostId; h.className = 'toast-host';
+    document.body.appendChild(h);
+  }
+  return h;
+}
+export function showToast(text, actions=[/* {label, onClick} */], timeout=2500){
+  const h = ensureHost();
+  const t = document.createElement('div'); t.className = 'toast';
+  t.innerHTML = `<div class="body">${escapeHtml(text)}</div>`;
+  if(actions.length){
+    const ac = document.createElement('div'); ac.className = 'actions';
+    actions.forEach(a=>{
+      const b = document.createElement('button');
+      b.textContent = a.label;
+      b.addEventListener('click', ()=>{ a.onClick?.(); dismiss(); });
+      ac.appendChild(b);
+    });
+    t.appendChild(ac);
+  }
+  h.appendChild(t);
+  requestAnimationFrame(()=> t.classList.add('show'));
+  const kill = setTimeout(()=> dismiss(), timeout);
+  function dismiss(){
+    clearTimeout(kill);
+    t.classList.remove('show');
+    setTimeout(()=> t.remove(), 200);
+  }
+  return dismiss;
+}
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+// List add pulse: call after DOM insert
+export function pulseRow(rowId){
+  const el = document.getElementById(rowId);
+  if(!el) return;
+  el.classList.add('pulse');
+  setTimeout(()=> el.classList.remove('pulse'), 1000);
+}
+
+// Progress bar helper
+export function setProgress(id, pct){
+  const el = document.querySelector(`#${id} > span`);
+  if(el) el.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+}
+
+// Skeleton control
+export function withSkeleton(el, fn){
+  // show skeleton if operation > 500ms
+  const skel = document.createElement('div'); skel.className='skel'; skel.style.height='1.75rem';
+  const t = setTimeout(()=> el.replaceChildren(skel), 500);
+  return fn().finally(()=>{ clearTimeout(t); });
+}
+```
+
+> 依存なし（素のJS）。`type="module"` で読み込めば `export` 利用可。
+
+
+### テンプレ適用例（Jinja）
+```html
+<!-- base.html -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/motion.css') }}">
+<script type="module" src="{{ url_for('static', filename='js/motion.js') }}"></script>
+
+<!-- Modal -->
+<div id="entryModal" class="modal-root" hidden aria-hidden="true">
+  <div class="modal-backdrop" onclick="closeModal('entryModal')"></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="entryTitle">
+    <h2 id="entryTitle">支出を登録</h2>
+    <!-- form fields -->
+    <div class="actions">
+      <button class="btn" onclick="closeModal('entryModal')">キャンセル</button>
+      <button class="btn btn-primary" onclick="submitEntry()">登録する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Progress -->
+<div id="budgetProgress" class="progress"><span style="width: {{ progress_pct }}%"></span></div>
+```
+
+
+### 画面フローへの組み込み（例）
+- **登録成功時**：
+  ```js
+  import { showToast, pulseRow } from '/static/js/motion.js';
+  async function submitEntry(){
+    const resp = await fetch('/api/entries', {method:'POST', body: new FormData(entryForm)});
+    if(resp.ok){
+      const { id } = await resp.json();
+      prependRowToList(id);           // DOM反映（あなたの既存処理）
+      pulseRow(`row-${id}`);          // 追加行を1秒ハイライト
+      showToast('登録しました', [
+        {label:'元に戻す', onClick: ()=> undoEntry(id) },
+        {label:'続けて追加', onClick: ()=> openModal('entryModal') }
+      ]);
+    }else{
+      showToast('保存に失敗しました。通信環境をご確認ください。', [], 4000);
+    }
+  }
+  ```
+- **月ヘッダーの進捗更新**：
+  ```js
+  import { setProgress } from '/static/js/motion.js';
+  setProgress('budgetProgress', newPct);
+  ```
+- **読み込みが重い一覧**：
+  ```js
+  import { withSkeleton } from '/static/js/motion.js';
+  const listHost = document.getElementById('listHost');
+  withSkeleton(listHost, async ()=>{
+    const html = await fetch('/list/partial').then(r=>r.text());
+    listHost.innerHTML = html;
+  });
+  ```
+
+
+### A11y & 品質チェック
+- [ ] `prefers-reduced-motion` でアニメ短縮（CSSあり）
+- [ ] モーダルは `aria-modal="true"` とフォーカス戻し
+- [ ] トーストは**重要操作**をボタンで提供（Undo 2.5s）
+- [ ] 進捗・残額など**ライブ値**は `aria-live="polite"` を付与
+- [ ] すべてのトランジションは **150–250ms** に収める（長過ぎ禁止）
+
+
+### 受け入れ基準（AC）
+- モーダルの**開閉が200ms**で自然（白飛び/カクつき無し）
+- 追加行ハイライトが**1秒以内**に消える
+- 進捗バーは更新時に**0.4–0.6s**でスムーズに追従
+- トーストが**自動で2.5s**後に消える（操作時は即消える）
+- `prefers-reduced-motion` で**一括抑制**される
+
+
+### テスト（最小）
+- Android Chrome / iOS Safari / デスクトップ Chrome & Safari で
+  - モーダル開→入力→閉で**フォーカスが戻る**
+  - 低端末（CPUスロットリング x4）で**フレーム落ちが無い**
+  - Reduce Motion 有効時に**トランジションが瞬間化**される
+- Lighthouse → **Best Practices/A11y ≥ 95**、**TBT**増加なし
+
+
+### パフォーマンス配慮
+- `will-change` は短時間のみ適用（既にmodal-panelで限定）
+- `transform/opacity` 以外のプロパティをアニメしない（レイアウトスラッシング回避）
+- JSの setTimeout は**200ms/1000msだけ**。ループ/長時間タイマーは無し
+
+
+### ロールアウト手順
+1. `static/css/motion.css` と `static/js/motion.js` を追加、`base.html` に読み込み
+2. モーダル/トーストのマークアップ差し替え（既存クラスに追加適用でも可）
+3. 「登録成功」「削除成功」などの箇所で `showToast/pulseRow/setProgress` を呼び出し
+4. QA → 本番
+
+> 以上で、見た目の“上質感”と**状態の可視化**が上がり、**既存の良さ**（簡潔さ/軽さ）を維持したまま世界レベルに寄せられます。
 
 ---
 

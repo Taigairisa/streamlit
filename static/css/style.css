@@ -12,7 +12,7 @@
   --color-info-light: #e2e8f0;
   --color-dark: #111827;
   --color-light: rgba(99, 102, 241, 0.12);
-  --color-background: #f6f6f9;
+  --color-background: #ffffff; /* light mode default background is white */
 
   --card-border-radius: 1rem;
   --border-radius-1: 0.4rem;
@@ -30,7 +30,7 @@
   --color-info-light: #fde2e7;
   --color-dark: #111827;
   --color-light: rgba(236, 72, 153, 0.12);
-  --color-background: #fff1f2;
+  /* background stays white in light mode */
 }
 
 [data-theme="orange"] {
@@ -42,7 +42,7 @@
   --color-info-light: #ffedd5;
   --color-dark: #111827;
   --color-light: rgba(249, 115, 22, 0.12);
-  --color-background: #fff7ed;
+  /* background stays white in light mode */
 }
 
 [data-theme="green"] {
@@ -54,7 +54,7 @@
   --color-info-light: #dcfce7;
   --color-dark: #111827;
   --color-light: rgba(16, 185, 129, 0.12);
-  --color-background: #f0fdf4;
+  /* background stays white in light mode */
 }
 
 [data-theme="slate"] {
@@ -66,7 +66,7 @@
   --color-info-light: #e2e8f0;
   --color-dark: #0f172a;
   --color-light: rgba(100, 116, 139, 0.12);
-  --color-background: #f1f5f9;
+  /* background stays white in light mode */
 }
 
 body {
@@ -205,4 +205,10 @@ body {
 [data-theme], :root {
   --color-danger-light: #fee2e2; /* red-100 */
   --color-success-light: #dcfce7; /* green-100 */
+}
+[data-mode="dark"] {
+  --color-background: #0f172a; /* page background */
+  --color-white: #111827;      /* card surfaces */
+  --color-dark: #e5e7eb;       /* text */
+  --color-info-light: #334155; /* subtle borders/backgrounds */
 }
