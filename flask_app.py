@@ -740,7 +740,6 @@ def delete_transaction(transaction_id):
 @app.route('/graphs')
 def graphs():
     import pandas as pd
-    import altair as alt
     aid = _get_current_user_aikotoba_id()
     monthly_summary_df = get_monthly_summary(aikotoba_id=aid)
 
@@ -766,31 +765,23 @@ def graphs():
         selected_start = None
         selected_end = None
 
-    # Monthly Income/Expense Chart
-    monthly_chart = alt.Chart(monthly_summary_df).mark_line().encode(
-        x=alt.X('month:T', axis=alt.Axis(title='月')),
-        y=alt.Y('当月収支:Q', axis=alt.Axis(title='当月収支')),
-        tooltip=['month:T', '当月収支:Q']
-    ).properties(
-        title='月次収支'
-    ).interactive()
+    # Prepare data for Chart.js
+    if not monthly_summary_df.empty:
+        labels = monthly_summary_df['month'].dt.strftime('%Y-%m').tolist()
+        monthly_values = monthly_summary_df['当月収支'].astype(float).tolist()
+        cumulative_values = monthly_summary_df['累計資産'].astype(float).tolist()
+    else:
+        labels, monthly_values, cumulative_values = [], [], []
 
-    # Cumulative Assets Chart
-    cumulative_chart = alt.Chart(monthly_summary_df).mark_line().encode(
-        x=alt.X('month:T', axis=alt.Axis(title='月')),
-        y=alt.Y('累計資産:Q', axis=alt.Axis(title='累計資産')),
-        tooltip=['month:T', '累計資産:Q']
-    ).properties(
-        title='累計資産推移'
-    ).interactive()
-
-    monthly_chart_json = json.dumps(monthly_chart.to_dict())
-    cumulative_chart_json = json.dumps(cumulative_chart.to_dict())
+    chart_data = json.dumps({
+        'labels': labels,
+        'monthly': monthly_values,
+        'cumulative': cumulative_values,
+    })
 
     return render_template(
         'graphs.html',
-        monthly_chart_json=monthly_chart_json,
-        cumulative_chart_json=cumulative_chart_json,
+        chart_data=chart_data,
         month_options=month_options,
         selected_start_month=selected_start,
         selected_end_month=selected_end,

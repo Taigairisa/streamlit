@@ -36,7 +36,7 @@
             <div class="card mb-4">
                 <div class="card-header">月次収支</div>
                 <div class="card-body">
-                    <div id="monthly_chart"></div>
+                    <canvas id="monthly_chart" height="240"></canvas>
                 </div>
             </div>
         </div>
@@ -44,18 +44,15 @@
             <div class="card mb-4">
                 <div class="card-header">累計資産推移</div>
                 <div class="card-body">
-                    <div id="cumulative_chart"></div>
+                    <canvas id="cumulative_chart" height="240"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
     {% block scripts %}
-    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
-    <script id="monthlyChartData" type="application/json">{{ monthly_chart_json | safe }}</script>
-    <script id="cumulativeChartData" type="application/json">{{ cumulative_chart_json | safe }}</script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script id="chartData" type="application/json">{{ chart_data | safe }}</script>
     <script src="{{ url_for('static', filename='js/graphs.js') }}"></script>
     {% endblock %}
 {% endblock %}
