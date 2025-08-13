@@ -25,7 +25,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="subCategorySelect" class="form-label">小カテゴリ</label>
+            <label for="category" class="form-label d-flex align-items-center gap-2">小カテゴリ <span id="subIconDisplay" style="font-size:1.1rem;"></span></label>
             <select class="form-select" id="category" name="sub_category_id" required>
                 <!-- Options will be populated by JavaScript -->
             </select>
@@ -81,6 +81,27 @@
         // Initial population
         document.addEventListener('DOMContentLoaded', updateSubCategories);
 
+        // Icon for selected subcategory (fetch presets)
+        let subMap = {};
+        async function fetchSubMeta(){
+          try{
+            const res = await fetch('/api/sub_categories');
+            if(!res.ok) return;
+            const list = await res.json();
+            subMap = Object.fromEntries(list.map(r=>[String(r.id), {icon:r.icon||'💡', color:r.color||'#64748b'}]));
+            updateIcon();
+          }catch(_){ }
+        }
+        function updateIcon(){
+          const sel = document.getElementById('category');
+          const disp = document.getElementById('subIconDisplay');
+          if(!sel || !disp) return;
+          const meta = subMap[String(sel.value)] || null;
+          disp.textContent = meta ? meta.icon : '';
+        }
+        document.getElementById('category').addEventListener('change', updateIcon);
+        fetchSubMeta();
+
         // ---- Others since my last (banner) ----
         async function fetchOthersSinceMyLast(scope='month', limit=5){
             const ym = document.body.dataset.currentYm || '';
@@ -117,10 +138,27 @@
         document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) fetchOthersSinceMyLast(); });
         fetchOthersSinceMyLast();
         scheduleSince();
+
+        // Type colorization for amount field
+        const typeSel = document.getElementById('typeSelect');
+        const amt = document.getElementById('amount');
+        function applyTypeColor(){
+          const v = (typeSel && typeSel.value) || '';
+          if(!amt) return;
+          amt.classList.remove('type-exp','type-inc','type-bud');
+          if(v==='支出') amt.classList.add('type-exp');
+          else if(v==='収入') amt.classList.add('type-inc');
+          else if(v==='予算') amt.classList.add('type-bud');
+        }
+        typeSel?.addEventListener('change', applyTypeColor);
+        applyTypeColor();
     </script>
     <style>
       .mru{display:flex;gap:.5rem;margin:.5rem 0}
       .mru .pill{padding:.25rem .5rem;border-radius:9999px;background: var(--color-info-light); border:1px solid var(--color-info-light)}
+      #amount.type-exp{ color: var(--color-danger); }
+      #amount.type-inc{ color: var(--color-success); }
+      #amount.type-bud{ color: var(--color-primary); }
     </style>
 {% endblock %}
 

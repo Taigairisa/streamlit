@@ -202,6 +202,12 @@ body {
 /* Category pill */
 .cat-pill { width: 28px; height: 28px; border-radius: 9999px; display: inline-grid; place-items: center; color: #fff; font-size: 12px; margin-right: .35rem; vertical-align: middle; }
 .cat-name { vertical-align: middle; }
+
+/* Preset editors (categories) */
+.preset-menu{ display:flex; flex-wrap: wrap; gap:.4rem; padding:.25rem; max-width: 280px; }
+.preset-item{ width:28px; height:28px; border-radius:9999px; border:1px solid var(--color-info-light); display:inline-grid; place-items:center; cursor:pointer; background:#fff; }
+.preset-item.color{ border-color: rgba(0,0,0,.1); }
+.swatch-dot{ display:inline-block; width:14px; height:14px; border-radius:9999px; vertical-align:middle; }
 [data-theme], :root {
   --color-danger-light: #fee2e2; /* red-100 */
   --color-success-light: #dcfce7; /* green-100 */

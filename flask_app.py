@@ -1028,7 +1028,20 @@ def api_others_since_my_last():
         cond += " AND strftime('%Y-%m', date) = :ym"
         params["ym"] = ym
     with engine.connect() as conn:
-        last_my_id = conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM transactions {cond}"), params).scalar() or 0
+        # Fallback if created_by column does not exist
+        has_cb = False
+        try:
+            cols = conn.execute(text("PRAGMA table_info(transactions)")).fetchall()
+            has_cb = any(c[1] == 'created_by' for c in cols)
+        except Exception:
+            has_cb = False
+
+        try:
+            last_my_id = conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM transactions {cond}"), params).scalar() or 0
+        except Exception:
+            # no created_by -> treat as 0
+            last_my_id = 0
+
         q = (
             """
             SELECT t.id, t.amount, t.detail, t.date,
@@ -1036,11 +1049,15 @@ def api_others_since_my_last():
               FROM transactions t
               LEFT JOIN sub_categories sc ON sc.id = t.sub_category_id
              WHERE t.aikotoba_id = :aid
-               AND (t.created_by IS NULL OR t.created_by <> :me)
+               AND ({created_by_clause})
                AND t.id > :last_id
                AND t.type IN ('収入','支出')
             """
         )
+        created_by_clause = "1=1"
+        if has_cb:
+            created_by_clause = "(t.created_by IS NULL OR t.created_by <> :me)"
+        q = q.format(created_by_clause=created_by_clause)
         p = {"aid": aid, "me": me, "last_id": int(last_my_id)}
         if scope == 'month':
             q += " AND strftime('%Y-%m', t.date) = :ym"

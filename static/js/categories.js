@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   let table = null;
-  let mainTable = null;
 
   // Presets
   const COLOR_PRESETS = {
@@ -47,6 +46,39 @@ document.addEventListener('DOMContentLoaded', function () {
   const ICON_PRESETS = {
     '💡': '電気/光熱', '🍔': '外食', '🛒': '食料品', '🚃': '交通', '🚗': '自動車', '🏠': '住居', '📱': '通信', '🏥': '医療', '🎉': '娯楽', '🧾': '税金', '💳': 'カード', '📦': '通販', '🧺': '日用品', '🍽️': '食事', '🍼': '育児', '💼': '仕事', '🏫': '教育', '🐾': 'ペット', '🎁': '贈与'
   };
+
+  // Custom editors to show swatches/icons instead of text list
+  function colorEditor(cell, onRendered, success, cancel){
+    const wrap = document.createElement('div');
+    wrap.className = 'preset-menu';
+    Object.keys(COLOR_PRESETS).forEach(code => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'preset-item color';
+      btn.style.background = code; btn.title = COLOR_PRESETS[code] || code;
+      btn.addEventListener('click', ()=> success(code));
+      wrap.appendChild(btn);
+    });
+    onRendered(()=> wrap.focus());
+    wrap.tabIndex = 0;
+    wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
+    return wrap;
+  }
+
+  function iconEditor(cell, onRendered, success, cancel){
+    const wrap = document.createElement('div');
+    wrap.className = 'preset-menu';
+    Object.keys(ICON_PRESETS).forEach(icon => {
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.className = 'preset-item icon';
+      btn.textContent = icon; btn.title = ICON_PRESETS[icon] || '';
+      btn.addEventListener('click', ()=> success(icon));
+      wrap.appendChild(btn);
+    });
+    onRendered(()=> wrap.focus());
+    wrap.tabIndex = 0;
+    wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
+    return wrap;
+  }
 
   function buildTable() {
     const pageSize = parseInt(pageSizeSel.value || '50', 10);
@@ -68,7 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
           field: 'main_category_id',
           hozAlign: 'left',
           headerHozAlign: 'left',
-          editor: 'select',
+          editor: 'list',
           editorParams: { values: mainOptions },
           formatter: function (cell) {
             const v = String(cell.getValue() || '');
@@ -76,14 +108,13 @@ document.addEventListener('DOMContentLoaded', function () {
           },
         },
         { title: '小カテゴリ名', field: 'name', editor: 'input', minWidth: 160 },
-        { title: '色', field: 'color', editor: 'select', editorParams: { values: COLOR_PRESETS }, minWidth: 140,
+        { title: '色', field: 'color', editor: colorEditor, minWidth: 140,
           formatter: function (cell) {
             const v = cell.getValue() || '#64748b';
-            const label = COLOR_PRESETS[v] || v;
-            return `<span style="display:inline-block;width:14px;height:14px;border-radius:999px;background:${v};vertical-align:middle;margin-right:.4rem"></span>${label}`;
+            return `<span class="swatch-dot" style="background:${v}"></span>`;
           }
         },
-        { title: 'アイコン', field: 'icon', editor: 'select', editorParams: { values: ICON_PRESETS }, minWidth: 120,
+        { title: 'アイコン', field: 'icon', editor: iconEditor, minWidth: 120,
           formatter: function (cell) {
             const v = cell.getValue() || '💡';
             return `<span style="font-size:1rem;">${v}</span>`;

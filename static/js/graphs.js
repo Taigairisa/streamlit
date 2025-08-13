@@ -11,6 +11,8 @@ document.addEventListener('DOMContentLoaded', function () {
       const monthlyCtx = document.getElementById('monthly_chart');
       const cumulativeCtx = document.getElementById('cumulative_chart');
       if (monthlyCtx) {
+        // destroy existing chart instance if any
+        if (Chart.getChart && Chart.getChart(monthlyCtx)) { Chart.getChart(monthlyCtx).destroy(); }
         new Chart(monthlyCtx, {
           type: 'line',
           data: {
@@ -35,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       }
       if (cumulativeCtx) {
+        if (Chart.getChart && Chart.getChart(cumulativeCtx)) { Chart.getChart(cumulativeCtx).destroy(); }
         new Chart(cumulativeCtx, {
           type: 'line',
           data: {

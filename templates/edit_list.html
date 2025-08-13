@@ -201,7 +201,7 @@
                     {title:'ID', field:'id', width:60, minWidth:60, hozAlign:'right', headerHozAlign:'right', sorter:'number'},
                     {title:'日付', field:'date', editor:'input', sorter:'datetime', sorterParams:{format:'YYYY-MM-DD'}, validator:[{type:'regex', param:/^\d{4}-\d{2}-\d{2}$/}], minWidth:100},
                     {title:'詳細', field:'detail', editor:'input', sorter:'string', minWidth:120},
-                    {title:'種別', field:'type', editor:'select', editorParams:{values:{'支出':'支出','収入':'収入','予算':'予算'}}, sorter:'string', validator:[{type:'in', parameters:['支出','収入','予算']}], minWidth:80},
+                    {title:'種別', field:'type', editor:'list', editorParams:{values:{'支出':'支出','収入':'収入','予算':'予算'}}, sorter:'string', validator:[{type:'in', parameters:['支出','収入','予算']}], minWidth:80},
                     {title:'金額', field:'amount', hozAlign:'right', editor:'number', editorParams:{min:0, step:1}, sorter:'number',
                       formatter:(cell)=>{
                         const v = cell.getValue() ?? 0;
