@@ -1,10 +1,25 @@
 // Lightweight editable table for Categories (no Tabulator)
 document.addEventListener('DOMContentLoaded', function(){
+  // Debounce helper function
+  function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+      const context = this;
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+  }
+  const debouncedLoad = debounce(() => ensureNoLoseChanges(load), 750);
+
+  let currentPage = 0;
+  let pageSize = 50; // Default page size
+
   const gridEl = document.getElementById('categoriesGrid');
   if (!gridEl) return;
 
   const tbl = document.getElementById('categoriesTable');
   const tbody = tbl.querySelector('tbody');
+  tbl.addEventListener('touchstart', (e) => { e.preventDefault(); });
   const mainSel = document.getElementById('catMainSelect');
   const liveFilter = document.getElementById('catLiveFilter');
   const infoEl = document.getElementById('catTableInfo');
@@ -13,6 +28,10 @@ document.addEventListener('DOMContentLoaded', function(){
   const applyBtn = document.getElementById('catApplyBtn');
   const reloadBtn = document.getElementById('catReloadBtn');
   const dirtyBadge = document.getElementById('catDirtyBadge');
+
+  const prevPageBtn = document.getElementById('catPrevPageBtn');
+  const nextPageBtn = document.getElementById('catNextPageBtn');
+  const pageSizeSelect = document.getElementById('catPageSizeSelect');
 
   const mainCatsJson = document.getElementById('mainCategoriesData');
   const mainCategories = mainCatsJson ? JSON.parse(mainCatsJson.textContent || '[]') : [];
@@ -30,6 +49,8 @@ document.addEventListener('DOMContentLoaded', function(){
     const url = new URL('/api/sub_categories', window.location.origin);
     if (mainSel.value) url.searchParams.set('main_category_id', mainSel.value);
     const q = (liveFilter.value||'').trim(); if (q) url.searchParams.set('q', q);
+    url.searchParams.set('limit', pageSize);
+    url.searchParams.set('offset', currentPage * pageSize);
     return url.toString();
   }
 
@@ -46,13 +67,21 @@ document.addEventListener('DOMContentLoaded', function(){
   function load(){
     fetch(buildApiUrl(), {cache:'no-store'})
       .then(async r=>{ if(!r.ok) throw new Error(await r.text()); return r.json(); })
-      .then(list=>{
+      .then(data=>{ // Assuming data is { items: [...], total_count: N }
+        const list = data.items;
+        const totalCount = data.total_count;
+
         originalById.clear();
         rows = list.map(r=>({ id:r.id, main_category_id:r.main_category_id, name:r.name, icon: r.icon || '💡' }));
         rows.forEach(r=> originalById.set(r.id, JSON.parse(JSON.stringify(r))));
         deleted.clear();
         render();
-        infoEl.textContent = `${rows.length} 件表示`;
+        infoEl.textContent = `${(currentPage * pageSize) + 1}-${(currentPage * pageSize) + rows.length} / ${totalCount} 件表示`;
+        
+        // Enable/disable pagination buttons
+        prevPageBtn.disabled = (currentPage === 0);
+        nextPageBtn.disabled = ((currentPage + 1) * pageSize >= totalCount);
+
         markDirty();
       })
       .catch(e=> showAlert('読み込みに失敗しました: '+e.message, 'danger', 5000));
@@ -230,8 +259,27 @@ document.addEventListener('DOMContentLoaded', function(){
   addBtn.addEventListener('click', ()=> addRow());
   applyBtn.addEventListener('click', applyChanges);
   reloadBtn.addEventListener('click', ()=> ensureNoLoseChanges(load));
-  mainSel.addEventListener('change', ()=> ensureNoLoseChanges(load));
-  liveFilter.addEventListener('input', ()=> ensureNoLoseChanges(load));
+  mainSel.addEventListener('change', ()=> debouncedLoad());
+  liveFilter.addEventListener('input', ()=> debouncedLoad());
+
+  prevPageBtn.addEventListener('click', ()=>{
+    if (currentPage > 0) {
+      currentPage--;
+      ensureNoLoseChanges(load);
+    }
+  });
+  nextPageBtn.addEventListener('click', ()=>{
+    currentPage++; // Optimistically increment, load will correct if out of bounds
+    ensureNoLoseChanges(load);
+  });
+  pageSizeSelect.addEventListener('change', ()=>{
+    pageSize = parseInt(pageSizeSelect.value, 10);
+    currentPage = 0; // Reset to first page when page size changes
+    ensureNoLoseChanges(load);
+  });
+  
+  
+  
 
   // Initial
   load();

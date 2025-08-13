@@ -1,9 +1,24 @@
 // Lightweight editable grid for Transactions (Edit tab)
 document.addEventListener('DOMContentLoaded', function(){
+  // Debounce helper function
+  function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+      const context = this;
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(context, args), delay);
+    };
+  }
+  const debouncedLoad = debounce(() => ensureNoLoseChanges(load), 750);
+
+  let currentPage = 0;
+  let pageSize = 50; // Default page size
+
   const tbl = document.getElementById('transactionsTable');
   if (!tbl) return;
 
   const tbody = tbl.querySelector('tbody');
+  tbl.addEventListener('touchstart', (e) => { e.preventDefault(); });
   const alertArea = document.getElementById('alertArea');
   const tableInfo = document.getElementById('tableInfo');
   const addBtn = document.getElementById('addRowBtn');
@@ -15,6 +30,11 @@ document.addEventListener('DOMContentLoaded', function(){
   const subSel = document.getElementById('subCategorySelect');
   const startDate = document.getElementById('startDate');
   const endDate = document.getElementById('endDate');
+  const liveFilter = document.getElementById('liveFilter');
+
+  const prevPageBtn = document.getElementById('prevPageBtn');
+  const nextPageBtn = document.getElementById('nextPageBtn');
+  const pageSizeSelect = document.getElementById('pageSizeSelect');
 
   const subJson = document.getElementById('subCategoriesData');
   const allSub = subJson ? JSON.parse(subJson.textContent||'[]') : [];
@@ -35,6 +55,9 @@ document.addEventListener('DOMContentLoaded', function(){
     if (subSel.value) url.searchParams.set('sub_category_id', subSel.value);
     if (startDate.value) url.searchParams.set('start_date', startDate.value);
     if (endDate.value) url.searchParams.set('end_date', endDate.value);
+    const q = (liveFilter.value||'').trim(); if (q) url.searchParams.set('q', q); // Add live filter query
+    url.searchParams.set('limit', pageSize);
+    url.searchParams.set('offset', currentPage * pageSize);
     return url.toString();
   }
   function updateSubFilter(){
@@ -55,13 +78,21 @@ document.addEventListener('DOMContentLoaded', function(){
     try{
       const r = await fetch(buildApiUrl(), {cache:'no-store'});
       if (!r.ok) throw new Error(await r.text());
-      const list = await r.json();
+      const data = await r.json(); // Assuming data is { items: [...], total_count: N }
+      const list = data.items;
+      const totalCount = data.total_count;
+
       originalById.clear();
       rows = list.map(x=>({ id:x.id, date:x.date, detail:x.detail||'', type:x.type, amount: x.amount, sub_category_id: x.sub_category_id }));
       rows.forEach(r=> originalById.set(r.id, JSON.parse(JSON.stringify(r))));
       deleted.clear();
       render();
-      tableInfo.textContent = `${rows.length} 件表示`;
+      tableInfo.textContent = `${(currentPage * pageSize) + 1}-${(currentPage * pageSize) + rows.length} / ${totalCount} 件表示`;
+      
+      // Enable/disable pagination buttons
+      prevPageBtn.disabled = (currentPage === 0);
+      nextPageBtn.disabled = ((currentPage + 1) * pageSize >= totalCount);
+
       markDirty();
     }catch(e){ showAlert('読み込みに失敗しました: '+e.message,'danger',5000); }
   }
@@ -189,10 +220,27 @@ document.addEventListener('DOMContentLoaded', function(){
   addBtn.addEventListener('click', addRow);
   applyBtn.addEventListener('click', applyChanges);
   reloadBtn.addEventListener('click', ()=> ensureNoLoseChanges(load));
-  mainSel.addEventListener('change', ()=>{ updateSubFilter(); ensureNoLoseChanges(load); });
-  subSel.addEventListener('change', ()=> ensureNoLoseChanges(load));
-  startDate.addEventListener('change', ()=> ensureNoLoseChanges(load));
-  endDate.addEventListener('change', ()=> ensureNoLoseChanges(load));
+  mainSel.addEventListener('change', ()=>{ updateSubFilter(); debouncedLoad(); });
+  subSel.addEventListener('change', ()=> debouncedLoad());
+  startDate.addEventListener('change', ()=> debouncedLoad());
+  endDate.addEventListener('change', ()=> debouncedLoad());
+  liveFilter.addEventListener('input', ()=> debouncedLoad());
+
+  prevPageBtn.addEventListener('click', ()=>{
+    if (currentPage > 0) {
+      currentPage--;
+      ensureNoLoseChanges(load);
+    }
+  });
+  nextPageBtn.addEventListener('click', ()=>{
+    currentPage++; // Optimistically increment, load will correct if out of bounds
+    ensureNoLoseChanges(load);
+  });
+  pageSizeSelect.addEventListener('change', ()=>{
+    pageSize = parseInt(pageSizeSelect.value, 10);
+    currentPage = 0; // Reset to first page when page size changes
+    ensureNoLoseChanges(load);
+  });
 
   // Init filters + load
   updateSubFilter();

@@ -31,6 +31,10 @@
                     <label for="endDate" class="form-label">終了日</label>
                     <input type="date" class="form-control" id="endDate" name="end_date" value="{{ request.args.get('end_date', '') }}">
                 </div>
+                <div class="col-md-4">
+                    <label for="liveFilter" class="form-label">メモ検索</label>
+                    <input type="text" class="form-control" id="liveFilter" placeholder="例: 食費, 生活 など">
+                </div>
             </form>
         </div>
     </div>
@@ -42,6 +46,22 @@
             <button id="reloadBtn" class="btn btn-sm btn-outline-secondary">再読込</button>
         </div>
         <div><small class="text-muted" id="tableInfo"></small> <span class="badge text-bg-warning" id="dirtyBadge" hidden>未保存の変更あり</span></div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="btn-group">
+            <button id="prevPageBtn" class="btn btn-sm btn-outline-secondary">前へ</button>
+            <button id="nextPageBtn" class="btn btn-sm btn-outline-secondary">次へ</button>
+        </div>
+        <div class="d-flex align-items-center">
+            <label for="pageSizeSelect" class="form-label me-2 mb-0">表示件数</label>
+            <select class="form-select form-select-sm" id="pageSizeSelect">
+                <option value="20">20</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="0">すべて</option>
+            </select>
+        </div>
     </div>
     <div id="alertArea"></div>
     <div id="transactionsGrid">

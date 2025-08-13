@@ -303,8 +303,10 @@ def api_get_transactions():
     sub_category_id = request.args.get('sub_category_id')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    limit = request.args.get('limit', type=int)
+    offset = request.args.get('offset', type=int)
 
-    query = """
+    base_query = """
         SELECT
             t.id, t.date, t.detail, t.type, t.amount,
             t.sub_category_id,
@@ -316,27 +318,51 @@ def api_get_transactions():
         JOIN main_categories mc ON sc.main_category_id = mc.id
         WHERE 1=1
     """
+    count_query = """
+        SELECT COUNT(*)
+        FROM transactions t
+        JOIN sub_categories sc ON t.sub_category_id = sc.id
+        JOIN main_categories mc ON sc.main_category_id = mc.id
+        WHERE 1=1
+    """
     params = {}
     if main_category_id:
-        query += " AND mc.id = :main_category_id"
+        base_query += " AND mc.id = :main_category_id"
+        count_query += " AND mc.id = :main_category_id"
         params['main_category_id'] = main_category_id
     if sub_category_id:
-        query += " AND t.sub_category_id = :sub_category_id"
+        base_query += " AND t.sub_category_id = :sub_category_id"
+        count_query += " AND t.sub_category_id = :sub_category_id"
         params['sub_category_id'] = sub_category_id
     if start_date:
-        query += " AND t.date >= :start_date"
+        base_query += " AND t.date >= :start_date"
+        count_query += " AND t.date >= :start_date"
         params['start_date'] = start_date
     if end_date:
-        query += " AND t.date <= :end_date"
+        base_query += " AND t.date <= :end_date"
+        count_query += " AND t.date <= :end_date"
         params['end_date'] = end_date
+    q = request.args.get('q') # Get the new query parameter
+    if q:
+        base_query += " AND t.detail LIKE :q" # Apply to detail column
+        count_query += " AND t.detail LIKE :q"
+        params['q'] = f"%{q}%"
     aid = _get_current_user_aikotoba_id()
-    query += " AND t.aikotoba_id = :aid ORDER BY t.date DESC, t.id DESC"
+    base_query += " AND t.aikotoba_id = :aid ORDER BY t.date DESC, t.id DESC"
+    count_query += " AND t.aikotoba_id = :aid"
 
     params['aid'] = aid
     with engine.connect() as conn:
-        rows = conn.execute(text(query), params).mappings().all()
+        total_count = conn.execute(text(count_query), params).scalar()
+
+        if limit is not None:
+            base_query += f" LIMIT {limit}"
+        if offset is not None:
+            base_query += f" OFFSET {offset}"
+
+        rows = conn.execute(text(base_query), params).mappings().all()
         data = [dict(r) for r in rows]
-    return jsonify(data)
+    return jsonify({"items": data, "total_count": total_count})
 
 
 @app.post('/api/transactions')
@@ -884,9 +910,18 @@ def api_get_sub_categories():
     engine = connect_db()
     main_category_id = request.args.get('main_category_id')
     q = request.args.get('q')
-    query = """
+    limit = request.args.get('limit', type=int)
+    offset = request.args.get('offset', type=int)
+
+    base_query = """
         SELECT sc.id, sc.name as sub_name, sc.main_category_id,
                mc.name as main_name, sc.color as color, sc.icon as icon
+          FROM sub_categories sc
+          JOIN main_categories mc ON sc.main_category_id = mc.id
+         WHERE 1 = 1
+    """
+    count_query = """
+        SELECT COUNT(*)
           FROM sub_categories sc
           JOIN main_categories mc ON sc.main_category_id = mc.id
          WHERE 1 = 1
@@ -894,17 +929,28 @@ def api_get_sub_categories():
     params = {}
     # scope by current user's aikotoba
     aid = _get_current_user_aikotoba_id()
-    query += " AND sc.aikotoba_id = :aid"
+    base_query += " AND sc.aikotoba_id = :aid"
+    count_query += " AND sc.aikotoba_id = :aid"
     params['aid'] = aid
     if main_category_id:
-        query += " AND sc.main_category_id = :mid"
+        base_query += " AND sc.main_category_id = :mid"
+        count_query += " AND sc.main_category_id = :mid"
         params['mid'] = main_category_id
     if q:
-        query += " AND (sc.name LIKE :q OR mc.name LIKE :q)"
+        base_query += " AND (sc.name LIKE :q OR mc.name LIKE :q)"
+        count_query += " AND (sc.name LIKE :q OR mc.name LIKE :q)"
         params['q'] = f"%{q}%"
-    query += " ORDER BY mc.id ASC, sc.id ASC"
+    base_query += " ORDER BY mc.id ASC, sc.id ASC"
+
     with engine.connect() as conn:
-        rows = conn.execute(text(query), params).mappings().all()
+        total_count = conn.execute(text(count_query), params).scalar()
+
+        if limit is not None:
+            base_query += f" LIMIT {limit}"
+        if offset is not None:
+            base_query += f" OFFSET {offset}"
+
+        rows = conn.execute(text(base_query), params).mappings().all()
         data = [
             {
                 'id': r['id'],
@@ -916,7 +962,7 @@ def api_get_sub_categories():
             }
             for r in rows
         ]
-    return jsonify(data)
+    return jsonify({"items": data, "total_count": total_count})
 
 
 @app.post('/api/sub_categories')

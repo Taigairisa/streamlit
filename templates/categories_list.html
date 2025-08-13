@@ -35,6 +35,7 @@
                         <option value="0">すべて</option>
                     </select>
                 </div>
+                
             </div>
         </div>
     </div>
@@ -46,6 +47,22 @@
             <button id="catReloadBtn" class="btn btn-sm btn-outline-secondary">再読込</button>
         </div>
         <div><small class="text-muted" id="catTableInfo"></small> <span class="badge text-bg-warning" id="catDirtyBadge" hidden>未保存の変更あり</span></div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="btn-group">
+            <button id="catPrevPageBtn" class="btn btn-sm btn-outline-secondary">前へ</button>
+            <button id="catNextPageBtn" class="btn btn-sm btn-outline-secondary">次へ</button>
+        </div>
+        <div class="d-flex align-items-center">
+            <label for="catPageSizeSelect" class="form-label me-2 mb-0">表示件数</label>
+            <select class="form-select form-select-sm" id="catPageSizeSelect">
+                <option value="20">20</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="0">すべて</option>
+            </select>
+        </div>
     </div>
     <div id="catAlertArea"></div>
     <div id="categoriesGrid">
