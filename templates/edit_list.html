@@ -144,12 +144,25 @@
             history.replaceState(null, '', url.pathname + '?' + params.toString());
         }
 
-        // Sub-category options map for editor
+        // Sub-category options map for editor + reverse map
         const subOptionsByMain = {};
+        const subToMain = {};
         for (const [sid, mid, name] of allSubCategories) {
             if (!subOptionsByMain[mid]) subOptionsByMain[mid] = {};
             subOptionsByMain[mid][sid] = name;
+            subToMain[sid] = mid;
         }
+
+        // Fallback main-color palette (by main-category id asc)
+        const MAIN_COLOR_PALETTE = ['#64748b','#3b82f6','#ec4899','#f97316','#10b981','#8b5cf6','#14b8a6','#f59e0b','#ef4444'];
+        const mainColorById = {};
+        (function buildMainColors(){
+            try {
+                const options = Array.from(document.getElementById('mainCategorySelect').options);
+                const ids = options.map(o=>parseInt(o.value,10)).filter(n=>!Number.isNaN(n)).sort((a,b)=>a-b);
+                ids.forEach((id, idx)=>{ mainColorById[String(id)] = MAIN_COLOR_PALETTE[idx % MAIN_COLOR_PALETTE.length]; });
+            } catch(_){}
+        })();
 
         // Spreadsheet-like grid (Tabulator)
         let table = null;
@@ -215,7 +228,8 @@
                     {title:'小カテゴリ', field:'sub_category_id', editor:subEditor, sorter:'number', validator:[{type:'required'}], mutatorData:(v)=>parseInt(v,10), minWidth:180,
                       formatter:(cell)=>{
                         const d = cell.getRow().getData();
-                        const color = d.sub_color || d.main_color || '#64748b';
+                        const mid = (typeof d.main_category_id !== 'undefined' && d.main_category_id!==null) ? d.main_category_id : subToMain[d.sub_category_id];
+                        const color = mainColorById[String(mid||'')] || '#64748b';
                         const icon = d.sub_icon || d.main_icon || '💡';
                         const name = d.sub_category_name || '';
                         return `<span class="cat-pill" style="background:${color}">${icon}</span> <span class="cat-name">${name}</span>`;

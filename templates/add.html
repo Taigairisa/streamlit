@@ -25,7 +25,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="category" class="form-label d-flex align-items-center gap-2">小カテゴリ <span id="subIconDisplay" style="font-size:1.1rem;"></span></label>
+            <label for="category" class="form-label d-flex align-items-center gap-2">小カテゴリ <span id="subIconDisplay" class="cat-pill" style="font-size:1.0rem; width: 24px; height:24px;"></span></label>
             <select class="form-select" id="category" name="sub_category_id" required>
                 <!-- Options will be populated by JavaScript -->
             </select>
@@ -75,6 +75,8 @@
                     subCategorySelect.appendChild(option);
                 }
             });
+            // Update icon pill and color when main changes
+            updateIcon();
         }
 
         mainCategorySelect.addEventListener('change', updateSubCategories);
@@ -83,6 +85,17 @@
 
         // Icon for selected subcategory (fetch presets)
         let subMap = {};
+        // Main category color mapping by ID (fixed palette, ID asc)
+        const MAIN_COLOR_PALETTE = ['#64748b','#3b82f6','#ec4899','#f97316','#10b981','#8b5cf6','#14b8a6','#f59e0b','#ef4444'];
+        const mainColorById = {};
+        (function buildMainColors(){
+          try {
+            const options = Array.from(document.getElementById('mainCategorySelect').options);
+            // options include 'value' as id in the order rendered; sort numerically by value
+            const ids = options.map(o=>parseInt(o.value,10)).filter(n=>!Number.isNaN(n)).sort((a,b)=>a-b);
+            ids.forEach((id, idx)=>{ mainColorById[String(id)] = MAIN_COLOR_PALETTE[idx % MAIN_COLOR_PALETTE.length]; });
+          } catch(_){}
+        })();
         async function fetchSubMeta(){
           try{
             const res = await fetch('/api/sub_categories');
@@ -98,6 +111,11 @@
           if(!sel || !disp) return;
           const meta = subMap[String(sel.value)] || null;
           disp.textContent = meta ? meta.icon : '';
+          // apply background color from selected main category
+          const mid = document.getElementById('mainCategorySelect')?.value || '';
+          const bg = mainColorById[String(mid)] || '#64748b';
+          disp.style.background = meta ? bg : 'transparent';
+          disp.style.color = meta ? '#fff' : 'inherit';
         }
         document.getElementById('category').addEventListener('change', updateIcon);
         fetchSubMeta();

@@ -1,4 +1,4 @@
-// Categories page: spreadsheet-like UX using Tabulator with fallback
+// Categories page: spreadsheet-like UX using Tabulator with simplified editors
 document.addEventListener('DOMContentLoaded', function () {
   const gridEl = document.getElementById('categoriesGrid');
   if (!gridEl) return;
@@ -31,107 +31,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
   let table = null;
 
-  // Presets
-  const COLOR_PRESETS = {
-    '#64748b': 'Slate',
-    '#3b82f6': 'Blue',
-    '#ec4899': 'Pink',
-    '#f97316': 'Orange',
-    '#10b981': 'Green',
-    '#ef4444': 'Red',
-    '#8b5cf6': 'Purple',
-    '#14b8a6': 'Teal',
-    '#f59e0b': 'Amber',
-  };
-  const ICON_PRESETS = {
-    '💡': '電気/光熱','🍔': '外食','🛒': '食料品','🚃': '交通','🚗': '自動車','🏠': '住居','📱': '通信','🏥': '医療','🎉': '娯楽','🧾': '税金','💳': 'カード','📦': '通販','🧺': '日用品','🍽️': '食事','🍼': '育児','💼': '仕事','🏫': '教育','🐾': 'ペット','🎁': '贈与',
-    '💰': '貯金','🧠': '学習','🏃': '運動','🧘': '健康','⚽': 'スポーツ','🎮': 'ゲーム','🎬': '映画','🎧': '音楽','📚': '書籍','✈️': '旅行','🧳': '旅費','⛽': 'ガソリン','🪑': '家具','🖥️': '家電','🥗': 'サラダ','🍣': '寿司','🍺': 'ビール','🍷': 'ワイン','☕': 'コーヒー','🍞': 'パン','🍰': 'スイーツ','💊': '薬','🧧': '祝儀','🐶': '犬','🐱': '猫','🧴':'化粧品','🧹':'掃除','🧽':'消耗品','🏖️':'レジャー','🚌':'バス','🚕':'タクシー','🚲':'自転車','🛏️':'寝具','🔧':'修理','🗂️':'サブスク'
-  };
-
-  // List editor item formatter helpers (for Tabulator 'list' editor)
-  function colorItemFormatter(value, text){
-    return `<span class="swatch-dot" style="background:${value}"></span>`;
-  }
-  function iconItemFormatter(value, text){
-    return `<span style="font-size:1.1rem; line-height:1;">${value}</span>`;
-  }
-
-  // Custom editors to show swatches/icons instead of text list
-  function colorEditor(cell, onRendered, success, cancel){
-    const wrap = document.createElement('div'); wrap.className = 'preset-menu';
-    const input = document.createElement('input'); input.type='text'; input.placeholder='検索'; input.className='form-control form-control-sm preset-search';
-    wrap.appendChild(input);
-    const list = document.createElement('div'); list.className='preset-list'; wrap.appendChild(list);
-    const entries = Object.entries(COLOR_PRESETS);
-    function render(filter){
-      list.innerHTML='';
-      entries.filter(([code,label])=>!filter || (label||'').toLowerCase().includes(filter)).forEach(([code,label])=>{
-        const btn = document.createElement('button'); btn.type='button'; btn.className='preset-item color';
-        btn.style.background = code; btn.title = label || code;
-        btn.addEventListener('click', ()=> success(code));
-        list.appendChild(btn);
-      });
-    }
-    input.addEventListener('input', ()=> render((input.value||'').trim().toLowerCase()));
-    onRendered(()=>{ wrap.focus(); render(''); });
-    wrap.tabIndex = 0; wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
-    return wrap;
-  }
-
-  function iconEditor(cell, onRendered, success, cancel){
-    const wrap = document.createElement('div'); wrap.className = 'preset-menu';
-    // 最近使ったアイコン
-    const mruRow = document.createElement('div'); mruRow.className = 'preset-list mru-row'; wrap.appendChild(mruRow);
-    // グループ（アイコンチップのみ）
-    const groupRow = document.createElement('div'); groupRow.className = 'preset-list group-row'; wrap.appendChild(groupRow);
-    // 検索（補助、文字）
-    const input = document.createElement('input'); input.type='text'; input.placeholder='検索'; input.className='form-control form-control-sm preset-search'; wrap.appendChild(input);
-    // 一覧
-    const list = document.createElement('div'); list.className='preset-list'; wrap.appendChild(list);
-
-    const entries = Object.entries(ICON_PRESETS); // [icon,label]
-    const KEY = 'icon_mru';
-    function getMRU(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(_){ return []; } }
-    function pushMRU(ic){ try{ const a=getMRU().filter(x=>x!==ic); a.unshift(ic); localStorage.setItem(KEY, JSON.stringify(a.slice(0,8))); }catch(_){ } }
-    function renderMRU(){
-      mruRow.innerHTML='';
-      const mru = getMRU();
-      mru.forEach(ic=>{ const b=document.createElement('button'); b.type='button'; b.className='preset-item icon'; b.textContent=ic; b.title='最近'; b.addEventListener('click', ()=>{ pushMRU(ic); success(ic); }); mruRow.appendChild(b); });
-    }
-    const GROUPS = {
-      '食': ['🍔','🛒','🍽️','🍺','🍷','☕','🍞','🍰','🍣','🥗'],
-      '移動': ['🚃','🚌','🚕','🚗','🚲','✈️','🧳','⛽'],
-      '住': ['🏠','🪑','🛏️','🖥️','🔧'],
-      '生活': ['💡','📱','🧴','🧹','🧽','📦','🗂️'],
-      '健康': ['🏥','💊','🧘','🏃'],
-      '趣味': ['🎉','🎮','🎬','🎧','📚','🏖️'],
-      'お金': ['💰','🧾','💳','🧧'],
-      '動物': ['🐶','🐱','🐾'],
-    };
-    function renderGroups(){
-      groupRow.innerHTML='';
-      Object.keys(GROUPS).forEach(k=>{
-        const ic = GROUPS[k][0];
-        const b=document.createElement('button'); b.type='button'; b.className='preset-item icon'; b.textContent=ic; b.title=k;
-        b.addEventListener('click', ()=> renderList('', GROUPS[k]));
-        groupRow.appendChild(b);
-      });
-    }
-    function renderList(filter, white){
-      list.innerHTML='';
-      entries.filter(([icon,label])=>{
-        if (white && white.length) return white.includes(icon);
-        if (!filter) return true; return (label||'').toLowerCase().includes(filter);
-      }).forEach(([icon,label])=>{
-        const btn=document.createElement('button'); btn.type='button'; btn.className='preset-item icon'; btn.textContent=icon; btn.title=label||'';
-        btn.addEventListener('click', ()=>{ pushMRU(icon); success(icon); });
-        list.appendChild(btn);
-      });
-    }
-    input.addEventListener('input', ()=> renderList((input.value||'').trim().toLowerCase()));
-    onRendered(()=>{ wrap.focus(); renderMRU(); renderGroups(); renderList(''); });
-    wrap.tabIndex = 0; wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
-    return wrap;
+  // アイコンはシンプルなプリセットのみ（ドロップダウン）
+  const ICON_CHOICES = ['💡','🍔','🛒','🚃','🚗','🏠','📱','🏥','🎉','🧾','💳','📦','🧺','🍽️','🍼','💼','🏫','🐾','🎁','💰','🧠','🏃','🧘','⚽','🎮','🎬','🎧','📚','✈️','🧳','⛽','🪑','🖥️','🥗','🍣','🍺','🍷','☕','🍞','🍰','💊','🧧','🐶','🐱','🧴','🧹','🧽','🏖️','🚌','🚕','🚲','🛏️','🔧','🗂️'];
+  // ネイティブセレクトのカスタムエディタ（スマホでキーボードを出さない）
+  function iconSelectEditor(cell, onRendered, success, cancel){
+    const select = document.createElement('select');
+    ICON_CHOICES.forEach(ic => {
+      const opt = document.createElement('option');
+      opt.value = ic; opt.textContent = ic; select.appendChild(opt);
+    });
+    select.value = cell.getValue() || ICON_CHOICES[0];
+    const commit = () => success(select.value);
+    select.addEventListener('change', commit);
+    select.addEventListener('blur', commit);
+    onRendered(() => select.focus());
+    return select;
   }
 
   function buildTable() {
@@ -161,13 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
           },
         },
         { title: '小カテゴリ名', field: 'name', editor: 'input', minWidth: 160 },
-        { title: '色', field: 'color', editor: 'list', editorParams: { values: COLOR_PRESETS, itemFormatter: colorItemFormatter, listItemFormatter: colorItemFormatter }, minWidth: 140,
-          formatter: function (cell) {
-            const v = cell.getValue() || '#64748b';
-            return `<span class="swatch-dot" style="background:${v}"></span>`;
-          }
-        },
-        { title: 'アイコン', field: 'icon', editor: 'list', editorParams: { values: ICON_PRESETS, itemFormatter: iconItemFormatter, listItemFormatter: iconItemFormatter }, minWidth: 120,
+        { title: 'アイコン', field: 'icon', editor: iconSelectEditor, minWidth: 120,
           formatter: function (cell) {
             const v = cell.getValue() || '💡';
             return `<span style="font-size:1rem;">${v}</span>`;
@@ -196,6 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const row = cell.getRow();
       const data = row.getData();
       const field = cell.getField();
+      // 色列は削除済み
       const newVal = data[field];
       const oldVal = typeof cell.getOldValue === 'function' ? cell.getOldValue() : undefined;
       if (oldVal === newVal) return;
@@ -220,8 +129,6 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!data.id) tryCreateRow(row);
     });
   }
-
-  // main categories editor removed
 
   function tryCreateRow(row) {
     const data = row.getData();
