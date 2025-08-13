@@ -58,34 +58,79 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Custom editors to show swatches/icons instead of text list
   function colorEditor(cell, onRendered, success, cancel){
-    const wrap = document.createElement('div');
-    wrap.className = 'preset-menu';
-    Object.keys(COLOR_PRESETS).forEach(code => {
-      const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'preset-item color';
-      btn.style.background = code; btn.title = COLOR_PRESETS[code] || code;
-      btn.addEventListener('click', ()=> success(code));
-      wrap.appendChild(btn);
-    });
-    onRendered(()=> wrap.focus());
-    wrap.tabIndex = 0;
-    wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
+    const wrap = document.createElement('div'); wrap.className = 'preset-menu';
+    const input = document.createElement('input'); input.type='text'; input.placeholder='検索'; input.className='form-control form-control-sm preset-search';
+    wrap.appendChild(input);
+    const list = document.createElement('div'); list.className='preset-list'; wrap.appendChild(list);
+    const entries = Object.entries(COLOR_PRESETS);
+    function render(filter){
+      list.innerHTML='';
+      entries.filter(([code,label])=>!filter || (label||'').toLowerCase().includes(filter)).forEach(([code,label])=>{
+        const btn = document.createElement('button'); btn.type='button'; btn.className='preset-item color';
+        btn.style.background = code; btn.title = label || code;
+        btn.addEventListener('click', ()=> success(code));
+        list.appendChild(btn);
+      });
+    }
+    input.addEventListener('input', ()=> render((input.value||'').trim().toLowerCase()));
+    onRendered(()=>{ wrap.focus(); render(''); });
+    wrap.tabIndex = 0; wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
     return wrap;
   }
 
   function iconEditor(cell, onRendered, success, cancel){
-    const wrap = document.createElement('div');
-    wrap.className = 'preset-menu';
-    Object.keys(ICON_PRESETS).forEach(icon => {
-      const btn = document.createElement('button');
-      btn.type = 'button'; btn.className = 'preset-item icon';
-      btn.textContent = icon; btn.title = ICON_PRESETS[icon] || '';
-      btn.addEventListener('click', ()=> success(icon));
-      wrap.appendChild(btn);
-    });
-    onRendered(()=> wrap.focus());
-    wrap.tabIndex = 0;
-    wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
+    const wrap = document.createElement('div'); wrap.className = 'preset-menu';
+    // 最近使ったアイコン
+    const mruRow = document.createElement('div'); mruRow.className = 'preset-list mru-row'; wrap.appendChild(mruRow);
+    // グループ（アイコンチップのみ）
+    const groupRow = document.createElement('div'); groupRow.className = 'preset-list group-row'; wrap.appendChild(groupRow);
+    // 検索（補助、文字）
+    const input = document.createElement('input'); input.type='text'; input.placeholder='検索'; input.className='form-control form-control-sm preset-search'; wrap.appendChild(input);
+    // 一覧
+    const list = document.createElement('div'); list.className='preset-list'; wrap.appendChild(list);
+
+    const entries = Object.entries(ICON_PRESETS); // [icon,label]
+    const KEY = 'icon_mru';
+    function getMRU(){ try{ return JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(_){ return []; } }
+    function pushMRU(ic){ try{ const a=getMRU().filter(x=>x!==ic); a.unshift(ic); localStorage.setItem(KEY, JSON.stringify(a.slice(0,8))); }catch(_){ } }
+    function renderMRU(){
+      mruRow.innerHTML='';
+      const mru = getMRU();
+      mru.forEach(ic=>{ const b=document.createElement('button'); b.type='button'; b.className='preset-item icon'; b.textContent=ic; b.title='最近'; b.addEventListener('click', ()=>{ pushMRU(ic); success(ic); }); mruRow.appendChild(b); });
+    }
+    const GROUPS = {
+      '食': ['🍔','🛒','🍽️','🍺','🍷','☕','🍞','🍰','🍣','🥗'],
+      '移動': ['🚃','🚌','🚕','🚗','🚲','✈️','🧳','⛽'],
+      '住': ['🏠','🪑','🛏️','🖥️','🔧'],
+      '生活': ['💡','📱','🧴','🧹','🧽','📦','🗂️'],
+      '健康': ['🏥','💊','🧘','🏃'],
+      '趣味': ['🎉','🎮','🎬','🎧','📚','🏖️'],
+      'お金': ['💰','🧾','💳','🧧'],
+      '動物': ['🐶','🐱','🐾'],
+    };
+    function renderGroups(){
+      groupRow.innerHTML='';
+      Object.keys(GROUPS).forEach(k=>{
+        const ic = GROUPS[k][0];
+        const b=document.createElement('button'); b.type='button'; b.className='preset-item icon'; b.textContent=ic; b.title=k;
+        b.addEventListener('click', ()=> renderList('', GROUPS[k]));
+        groupRow.appendChild(b);
+      });
+    }
+    function renderList(filter, white){
+      list.innerHTML='';
+      entries.filter(([icon,label])=>{
+        if (white && white.length) return white.includes(icon);
+        if (!filter) return true; return (label||'').toLowerCase().includes(filter);
+      }).forEach(([icon,label])=>{
+        const btn=document.createElement('button'); btn.type='button'; btn.className='preset-item icon'; btn.textContent=icon; btn.title=label||'';
+        btn.addEventListener('click', ()=>{ pushMRU(icon); success(icon); });
+        list.appendChild(btn);
+      });
+    }
+    input.addEventListener('input', ()=> renderList((input.value||'').trim().toLowerCase()));
+    onRendered(()=>{ wrap.focus(); renderMRU(); renderGroups(); renderList(''); });
+    wrap.tabIndex = 0; wrap.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ cancel(); } });
     return wrap;
   }
 
@@ -93,7 +138,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const pageSize = parseInt(pageSizeSel.value || '50', 10);
     table = new Tabulator(gridEl, {
       layout: 'fitColumns',
-      responsiveLayout: 'hide', // Added responsive layout
       height: '600px',
       selectable: true,
       clipboard: true,

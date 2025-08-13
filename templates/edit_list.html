@@ -59,9 +59,12 @@
                     <label for="endDate" class="form-label">終了日</label>
                     <input type="date" class="form-control" id="endDate" name="end_date" value="{{ request.args.get('end_date', '') }}">
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <label for="liveFilter" class="form-label">ライブ検索（詳細・種別を含む）</label>
-                    <input type="text" class="form-control" id="liveFilter" placeholder="例: 食費, 収入 など">
+                    <div class="input-group">
+                      <input type="text" class="form-control" id="liveFilter" placeholder="例: 食費, 収入 など">
+                      <button class="btn btn-outline-secondary btn-sm" type="button" id="liveFilterBtn">検索</button>
+                    </div>
                 </div>
                 <div class="col-md-2">
                     <label for="pageSize" class="form-label">表示件数</label>
@@ -94,6 +97,7 @@
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
         const liveFilterInput = document.getElementById('liveFilter');
+        const liveFilterBtn = document.getElementById('liveFilterBtn');
         const pageSizeSelect = document.getElementById('pageSize');
         const tableInfo = document.getElementById('tableInfo');
         const gridEl = document.getElementById('transactionsGrid');
@@ -130,17 +134,14 @@
         }
 
         function applyFilter() {
+            // Update URL without reload, then refresh table
             const url = new URL(window.location.href);
-            const params = new URLSearchParams(url.search);
+            const params = url.searchParams;
             params.set('main_category_id', mainCategorySelect.value);
-            if (subCategorySelect.value) {
-                params.set('sub_category_id', subCategorySelect.value);
-            } else {
-                params.delete('sub_category_id');
-            }
-            if (startDateInput.value) params.set('start_date', startDateInput.value);
-            if (endDateInput.value) params.set('end_date', endDateInput.value);
-            window.location.href = "{{ url_for('edit') }}?" + params.toString();
+            if (subCategorySelect.value) params.set('sub_category_id', subCategorySelect.value); else params.delete('sub_category_id');
+            if (startDateInput.value) params.set('start_date', startDateInput.value); else params.delete('start_date');
+            if (endDateInput.value) params.set('end_date', endDateInput.value); else params.delete('end_date');
+            history.replaceState(null, '', url.pathname + '?' + params.toString());
         }
 
         // Sub-category options map for editor
@@ -305,14 +306,33 @@
 
         // removed: others-since banner (moved to Add page)
 
-        mainCategorySelect.addEventListener('change', () => {
-            updateSubCategories();
-            applyFilter();
-            reloadTable();
-        });
+        mainCategorySelect.addEventListener('change', () => { updateSubCategories(); applyFilter(); reloadTable(); });
         subCategorySelect.addEventListener('change', ()=>{ applyFilter(); reloadTable(); });
         startDateInput.addEventListener('change', ()=>{ applyFilter(); reloadTable(); });
         endDateInput.addEventListener('change', ()=>{ applyFilter(); reloadTable(); });
+
+        // prevent form submit from reloading page
+        document.getElementById('filterForm').addEventListener('submit', function(e){ e.preventDefault(); applyFilter(); reloadTable(); });
+
+        // Manual search button (client-side filter)
+        function applyLiveFilter(){
+            const q = (liveFilterInput.value || '').trim();
+            if (!table) return;
+            table.clearFilter(true);
+            if (!q){ return; }
+            const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            table.setFilter((data)=>{
+                return re.test(String(data.detail||'')) || re.test(String(data.type||'')) || re.test(String(data.sub_category_name||''));
+            });
+        }
+        liveFilterBtn.addEventListener('click', applyLiveFilter);
+        liveFilterInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ applyLiveFilter(); }});
+        // Live search with debounce
+        let lfTimer;
+        liveFilterInput.addEventListener('input', ()=>{
+            clearTimeout(lfTimer);
+            lfTimer = setTimeout(applyLiveFilter, 200);
+        });
 
         // ---------- Basic fallback grid (no external libs) ----------
         let basicData = [];
