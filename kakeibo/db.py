@@ -91,6 +91,19 @@ def ensure_aikotoba_schema():
         for table in ("users", "main_categories", "sub_categories", "transactions"):
             conn.execute(text(f"UPDATE {table} SET aikotoba_id = :did WHERE aikotoba_id IS NULL"), {"did": nitome_id})
 
+        # Track author and timestamp on transactions for activity insights
+        if not _column_exists(conn, "transactions", "created_by"):
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN created_by TEXT"))
+        if not _column_exists(conn, "transactions", "created_at"):
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now'))"))
+
+        # Helpful indexes for activity queries
+        try:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_aid_created_by_id ON transactions(aikotoba_id, created_by, id DESC)"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_transactions_aid_id ON transactions(aikotoba_id, id DESC)"))
+        except Exception:
+            pass
+
         # invites/events creation removed (rollback of TASK-005)
 
 

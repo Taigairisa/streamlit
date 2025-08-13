@@ -201,22 +201,36 @@ def add():
             sub_aid = conn.execute(text("SELECT aikotoba_id FROM sub_categories WHERE id = :sid"), {"sid": sub_category_id}).scalar()
             if sub_aid is None:
                 sub_aid = _get_current_user_aikotoba_id()
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id)
-                    VALUES (:sid, :amount, :type, :date, :detail, :aid)
-                    """
-                ),
-                {
-                    "sid": sub_category_id,
-                    "amount": amount,
-                    "type": transaction_type,
-                    "date": transaction_date,
-                    "detail": detail,
-                    "aid": sub_aid,
-                },
-            )
+            params = {
+                "sid": sub_category_id,
+                "amount": amount,
+                "type": transaction_type,
+                "date": transaction_date,
+                "detail": detail,
+                "aid": sub_aid,
+                "created_by": session.get('auth_user') or 'guest',
+            }
+            try:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id, created_by)
+                        VALUES (:sid, :amount, :type, :date, :detail, :aid, :created_by)
+                        """
+                    ),
+                    params,
+                )
+            except Exception:
+                # Fallback for environments where created_by column isn't available yet
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id)
+                        VALUES (:sid, :amount, :type, :date, :detail, :aid)
+                        """
+                    ),
+                    params,
+                )
         return redirect(url_for('index'))
 
     return render_template(
@@ -294,7 +308,7 @@ def api_get_transactions():
         SELECT
             t.id, t.date, t.detail, t.type, t.amount,
             t.sub_category_id,
-            sc.name as sub_category_name,
+            sc.name as sub_category_name, sc.color as sub_color, sc.icon as sub_icon,
             mc.id as main_category_id, mc.name as main_category_name,
             mc.color as main_color, mc.icon as main_icon
         FROM transactions t
@@ -337,22 +351,35 @@ def api_create_transaction():
         sub_aid = conn.execute(text("SELECT aikotoba_id FROM sub_categories WHERE id = :sid"), {"sid": payload['sub_category_id']}).scalar()
         if sub_aid is None:
             sub_aid = _get_current_user_aikotoba_id()
-        result = conn.execute(
-            text(
-                """
-                INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id)
-                VALUES (:sid, :amount, :type, :date, :detail, :aid)
-                """
-            ),
-            {
-                "sid": payload['sub_category_id'],
-                "amount": payload['amount'],
-                "type": payload['type'],
-                "date": payload['date'],
-                "detail": payload.get('detail', ''),
-                "aid": sub_aid,
-            },
-        )
+        params = {
+            "sid": payload['sub_category_id'],
+            "amount": payload['amount'],
+            "type": payload['type'],
+            "date": payload['date'],
+            "detail": payload.get('detail', ''),
+            "aid": sub_aid,
+            "created_by": session.get('auth_user') or 'guest',
+        }
+        try:
+            result = conn.execute(
+                text(
+                    """
+                    INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id, created_by)
+                    VALUES (:sid, :amount, :type, :date, :detail, :aid, :created_by)
+                    """
+                ),
+                params,
+            )
+        except Exception:
+            result = conn.execute(
+                text(
+                    """
+                    INSERT INTO transactions (sub_category_id, amount, type, date, detail, aikotoba_id)
+                    VALUES (:sid, :amount, :type, :date, :detail, :aid)
+                    """
+                ),
+                params,
+            )
         new_id = result.lastrowid
         try:
             pass
@@ -859,7 +886,7 @@ def api_get_sub_categories():
     q = request.args.get('q')
     query = """
         SELECT sc.id, sc.name as sub_name, sc.main_category_id,
-               mc.name as main_name
+               mc.name as main_name, sc.color as color, sc.icon as icon
           FROM sub_categories sc
           JOIN main_categories mc ON sc.main_category_id = mc.id
          WHERE 1 = 1
@@ -884,6 +911,8 @@ def api_get_sub_categories():
                 'name': r['sub_name'],
                 'main_category_id': r['main_category_id'],
                 'main_category_name': r['main_name'],
+                'color': r['color'],
+                'icon': r['icon'],
             }
             for r in rows
         ]
@@ -916,7 +945,7 @@ def api_create_sub_category():
 def api_update_sub_category(sub_id: int):
     engine = connect_db()
     payload = request.get_json(force=True, silent=True) or {}
-    allowed = {'name', 'main_category_id'}
+    allowed = {'name', 'main_category_id', 'color', 'icon'}
     fields = {k: payload[k] for k in allowed if k in payload}
     if not fields:
         return jsonify({"error": "更新対象フィールドがありません"}), 400
@@ -978,6 +1007,56 @@ def api_update_main_category(main_id: int):
     with engine.begin() as conn:
         r = conn.execute(text(f"UPDATE main_categories SET {set_clause} WHERE id = :id AND aikotoba_id = :aid"), fields)
     return jsonify({"updated": r.rowcount})
+
+# ===== Activity: others since my last =====
+
+@app.get('/api/entries/others_since_my_last')
+def api_others_since_my_last():
+    engine = connect_db()
+    aid = _get_current_user_aikotoba_id()
+    me = session.get('auth_user') or 'guest'
+    limit = request.args.get('limit', default=5, type=int) or 5
+    limit = min(max(limit, 1), 20)
+    scope = request.args.get('scope', default='month')
+    ym = request.args.get('m') or request.args.get('month') or None
+    if not ym:
+        ym = datetime.now(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m')
+
+    params = {"aid": aid, "me": me}
+    cond = "WHERE aikotoba_id = :aid AND created_by = :me"
+    if scope == 'month':
+        cond += " AND strftime('%Y-%m', date) = :ym"
+        params["ym"] = ym
+    with engine.connect() as conn:
+        last_my_id = conn.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM transactions {cond}"), params).scalar() or 0
+        q = (
+            """
+            SELECT t.id, t.amount, t.detail, t.date,
+                   sc.name AS sub_category, t.created_by AS author
+              FROM transactions t
+              LEFT JOIN sub_categories sc ON sc.id = t.sub_category_id
+             WHERE t.aikotoba_id = :aid
+               AND (t.created_by IS NULL OR t.created_by <> :me)
+               AND t.id > :last_id
+               AND t.type IN ('収入','支出')
+            """
+        )
+        p = {"aid": aid, "me": me, "last_id": int(last_my_id)}
+        if scope == 'month':
+            q += " AND strftime('%Y-%m', t.date) = :ym"
+            p["ym"] = ym
+        q += " ORDER BY t.id DESC LIMIT :lim"
+        p["lim"] = limit
+        rows = conn.execute(text(q), p).mappings().all()
+        items = [dict(r) for r in rows]
+        count = len(items)
+    return jsonify({
+        "since_my_id": int(last_my_id),
+        "scope": scope,
+        "ym": ym,
+        "count": count,
+        "items": items,
+    })
 
 ## SSE removed per rollback request
 

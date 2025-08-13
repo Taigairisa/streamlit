@@ -1,19 +1,21 @@
 <div class="card mb-3" id="topProgressCard">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <div class="d-flex align-items-center gap-3">
-      <strong>月の選択</strong>
-      <select class="form-select form-select-sm" id="monthSelect">
-        {% for month_option in months %}
-          <option value="{{ month_option }}" {% if month_option == selected_month %}selected{% endif %}>{{ month_option }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#topProgressCollapse" aria-expanded="true" aria-controls="topProgressCollapse" id="topProgressToggle">
-      ▲
-    </button>
+    <strong>月の選択</strong>
+    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#topProgressCollapse" aria-expanded="true" aria-controls="topProgressCollapse" id="topProgressToggle">▲</button>
   </div>
   <div id="topProgressCollapse" class="collapse show">
     <div class="card-body">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <select class="form-select form-select-sm" id="monthSelect" style="max-width: 10rem;">
+          {% for month_option in months %}
+            <option value="{{ month_option }}" {% if month_option == selected_month %}selected{% endif %}>{{ month_option }}</option>
+          {% endfor %}
+        </select>
+        <div class="ms-auto d-flex gap-2">
+          <button id="mPrev" class="btn btn-outline-secondary btn-sm" aria-label="前の月へ">前の月へ</button>
+          <button id="mNext" class="btn btn-outline-secondary btn-sm" aria-label="次の月へ">次の月へ</button>
+        </div>
+      </div>
       {% if budget_progress %}
         {% for item in budget_progress %}
           <div class="mb-3">
@@ -32,4 +34,3 @@
     </div>
   </div>
 </div>
-

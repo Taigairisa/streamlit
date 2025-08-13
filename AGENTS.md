@@ -283,3 +283,12 @@
 ### 2025-08-13 TASK-005（撤回）
 - 理由: 招待/通知の実装によりパフォーマンス劣化が見られたため全面ロールバック。
 - 状態: コード・テンプレから招待/QR/SSEを削除。既存DBに `invites`/`events` が残存しても動作に影響なし（新規作成もしない）。
+- 2025-08-13 TASK-006（他ユーザーの追加検知）
+  - スキーマ: `transactions` に `created_by TEXT`, `created_at TEXT DEFAULT (datetime('now'))` を不足時に自動追加。索引用に `(aikotoba_id, created_by, id DESC)` / `(aikotoba_id, id DESC)` を作成。
+  - API: `GET /api/entries/others_since_my_last?limit=5&scope=month|all[&m=YYYY-MM]` を追加。自分の最新ID以降の「他ユーザーの」取引（支出/収入）を返す（テナント=合言葉単位）。
+  - UI: 編集ページ上部にバナー（件数）と詳細リストを追加。45秒ごとに可視時のみポーリング。月切替に追従。
+
+- 2025-08-13 TASK-007（モーション/マイクロインタラクション）
+  - CSS: `static/css/motion.css` にモーション設計トークンとコンポーネントスタイル（モーダル、パルス、トースト）を追加。
+  - JS: `static/js/motion.js` で `window.MOTION.showToast/pulseRow` を提供。ベースに読み込み。
+  - 適用: 取引の新規作成成功時に追加行へ1秒のパルスを付与。`prefers-reduced-motion` に準拠。

@@ -7,6 +7,12 @@
 {% endblock %}
 
 {% block content %}
+    <div class="since-banner alert alert-info py-2 px-3 d-flex justify-content-between align-items-center" id="sinceBanner" hidden>
+        <div>前回のあなたの登録以降に <b id="sinceCount">0</b> 件追加されています。</div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="sinceOpen">詳細</button>
+    </div>
+    <div id="sinceMenu" class="card card-body mb-3" hidden></div>
+
     <form id="entry" method="POST" action="{{ url_for('add') }}">
         <div id="mruCats" class="mru"></div>
         <div class="mb-3">
@@ -74,6 +80,43 @@
         mainCategorySelect.addEventListener('change', updateSubCategories);
         // Initial population
         document.addEventListener('DOMContentLoaded', updateSubCategories);
+
+        // ---- Others since my last (banner) ----
+        async function fetchOthersSinceMyLast(scope='month', limit=5){
+            const ym = document.body.dataset.currentYm || '';
+            const url = `/api/entries/others_since_my_last?scope=${scope}&limit=${limit}${ym?`&m=${ym}`:''}`;
+            try{
+                const res = await fetch(url, {cache:'no-store'});
+                if(!res.ok) return;
+                const data = await res.json();
+                renderSince(data);
+            }catch(e){/* noop */}
+        }
+        function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+        function renderSince(data){
+            const banner = document.getElementById('sinceBanner');
+            const countEl = document.getElementById('sinceCount');
+            const menu = document.getElementById('sinceMenu');
+            countEl.textContent = data.count || 0;
+            banner.hidden = (data.count||0) === 0;
+            menu.innerHTML = (data.items||[]).map(it=>`
+                <div class="since-item d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <b>${escapeHtml(it.author||'誰か')}</b> が <b>${escapeHtml(it.sub_category||'未分類')}</b> を登録：¥${Number(it.amount||0).toLocaleString('ja-JP')}
+                    <div class="text-muted small">${escapeHtml(it.detail||'')}</div>
+                  </div>
+                  <time class="text-muted small">${escapeHtml(it.date||'')}</time>
+                </div>
+            `).join('') || '<div class="text-muted">新しい追加はありません。</div>';
+        }
+        document.getElementById('sinceOpen').addEventListener('click', ()=>{
+            const m = document.getElementById('sinceMenu'); m.hidden = !m.hidden;
+        });
+        let sinceTimer;
+        function scheduleSince(ms=45000){ clearInterval(sinceTimer); sinceTimer = setInterval(()=>{ if(!document.hidden) fetchOthersSinceMyLast(); }, ms); }
+        document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) fetchOthersSinceMyLast(); });
+        fetchOthersSinceMyLast();
+        scheduleSince();
     </script>
     <style>
       .mru{display:flex;gap:.5rem;margin:.5rem 0}

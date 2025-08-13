@@ -1,0 +1,37 @@
+/* Motion tokens */
+:root{
+  --dur-quick: 150ms;
+  --dur-base:  200ms;
+  --dur-slow:  300ms;
+  --e-out:     cubic-bezier(.2,.8,.2,1);
+  --e-in:      cubic-bezier(.4,0,1,1);
+  --e-inout:   cubic-bezier(.4,0,.2,1);
+  --e-smooth:  cubic-bezier(.22,.61,.36,1);
+}
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Modal */
+.modal-backdrop{ position: fixed; inset: 0; background: rgba(15,23,42,.45); opacity: 0; transition: opacity var(--dur-base) var(--e-out); }
+.modal-panel{ transform: translateY(16px) scale(.98); opacity: 0; transition: transform var(--dur-base) var(--e-out), opacity var(--dur-base) var(--e-out); will-change: transform, opacity; }
+.modal-open .modal-backdrop{ opacity: 1; }
+.modal-open .modal-panel{ transform: translateY(0) scale(1); opacity: 1; }
+
+/* List add pulse */
+.pulse{ animation: pulse-bg 1000ms var(--e-smooth); }
+@keyframes pulse-bg{ 0%{ background: #fffbe6; } 100%{ background: transparent; } }
+
+/* Toast */
+.toast-host{ position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); display:grid; gap:.5rem; z-index: 1070; }
+.toast{ min-width: 240px; max-width: 520px; padding:.75rem 1rem; background:#111827; color:#fff; border-radius:.75rem; box-shadow:0 8px 24px rgba(0,0,0,.22); transform: translateY(8px); opacity: 0; transition: transform var(--dur-base) var(--e-out), opacity var(--dur-base) var(--e-out); }
+.toast.show{ transform: translateY(0); opacity: 1; }
+.toast .actions{ display:flex; gap:.5rem; margin-top:.25rem; }
+.toast button{ color:#93c5fd; border:0; background:none; padding:.25rem .5rem; border-radius:.5rem; }
+.toast button:hover{ background: rgba(255,255,255,.08); }
+

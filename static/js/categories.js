@@ -32,6 +32,22 @@ document.addEventListener('DOMContentLoaded', function () {
   let table = null;
   let mainTable = null;
 
+  // Presets
+  const COLOR_PRESETS = {
+    '#64748b': 'Slate',
+    '#3b82f6': 'Blue',
+    '#ec4899': 'Pink',
+    '#f97316': 'Orange',
+    '#10b981': 'Green',
+    '#ef4444': 'Red',
+    '#8b5cf6': 'Purple',
+    '#14b8a6': 'Teal',
+    '#f59e0b': 'Amber',
+  };
+  const ICON_PRESETS = {
+    '💡': '電気/光熱', '🍔': '外食', '🛒': '食料品', '🚃': '交通', '🚗': '自動車', '🏠': '住居', '📱': '通信', '🏥': '医療', '🎉': '娯楽', '🧾': '税金', '💳': 'カード', '📦': '通販', '🧺': '日用品', '🍽️': '食事', '🍼': '育児', '💼': '仕事', '🏫': '教育', '🐾': 'ペット', '🎁': '贈与'
+  };
+
   function buildTable() {
     const pageSize = parseInt(pageSizeSel.value || '50', 10);
     table = new Tabulator(gridEl, {
@@ -59,7 +75,20 @@ document.addEventListener('DOMContentLoaded', function () {
             return mainOptions[v] || v;
           },
         },
-        { title: '小カテゴリ名', field: 'name', editor: 'input' },
+        { title: '小カテゴリ名', field: 'name', editor: 'input', minWidth: 160 },
+        { title: '色', field: 'color', editor: 'select', editorParams: { values: COLOR_PRESETS }, minWidth: 140,
+          formatter: function (cell) {
+            const v = cell.getValue() || '#64748b';
+            const label = COLOR_PRESETS[v] || v;
+            return `<span style="display:inline-block;width:14px;height:14px;border-radius:999px;background:${v};vertical-align:middle;margin-right:.4rem"></span>${label}`;
+          }
+        },
+        { title: 'アイコン', field: 'icon', editor: 'select', editorParams: { values: ICON_PRESETS }, minWidth: 120,
+          formatter: function (cell) {
+            const v = cell.getValue() || '💡';
+            return `<span style="font-size:1rem;">${v}</span>`;
+          }
+        },
         {
           title: '操作', field: 'ops', headerSort: false, width: 120, hozAlign: 'center',
           formatter: function () { return '<button class="btn btn-sm btn-danger">削除</button>'; },
@@ -108,49 +137,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  function buildMainTable() {
-    const grid = document.getElementById('mainCategoriesGrid');
-    if (!grid) return;
-    mainTable = new Tabulator(grid, {
-      layout: 'fitColumns',
-      height: '400px',
-      selectable: false,
-      ajaxURL: '/api/main_categories',
-      columns: [
-        { title: 'ID', field: 'id', width: 80, hozAlign: 'right', headerHozAlign: 'right', sorter: 'number' },
-        { title: '名称', field: 'name', editor: 'input', minWidth: 140 },
-        { title: '色', field: 'color', editor: 'input', minWidth: 120, formatter: function (cell) {
-            const v = cell.getValue() || '#64748b';
-            return `<span style="display:inline-block;width:14px;height:14px;border-radius:999px;background:${v};vertical-align:middle;margin-right:.4rem"></span>${v}`;
-          }
-        },
-        { title: 'アイコン', field: 'icon', editor: 'input', minWidth: 100, formatter: function (cell) {
-            const v = cell.getValue() || '💡';
-            return `<span style="font-size:1rem;">${v}</span>`;
-          }
-        },
-      ],
-    });
-
-    mainTable.on('cellEdited', function (cell) {
-      const row = cell.getRow();
-      const data = row.getData();
-      const field = cell.getField();
-      const newVal = data[field];
-      const oldVal = typeof cell.getOldValue === 'function' ? cell.getOldValue() : undefined;
-      if (oldVal === newVal) return;
-      const col = cell.getColumn();
-      const title = col && col.getDefinition ? (col.getDefinition().title || field) : field;
-      const ok = confirm(`以下を変更します:\n${title}: ${oldVal ?? ''} → ${newVal ?? ''}\n保存してよろしいですか？`);
-      if (!ok) {
-        try { if (typeof cell.restoreOldValue === 'function') cell.restoreOldValue(); else cell.setValue(oldVal, true); } catch (_) {}
-        return;
-      }
-      const payload = { [field]: newVal };
-      fetch(`/api/main_categories/${data.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-        .then(r => { if (!r.ok) showAlert('更新に失敗しました', 'danger'); else showAlert('更新しました', 'success', 1200); });
-    });
-  }
+  // main categories editor removed
 
   function tryCreateRow(row) {
     const data = row.getData();
@@ -179,12 +166,7 @@ document.addEventListener('DOMContentLoaded', function () {
   // Initialize
   if (window.Tabulator) buildTable();
   else {
-    // Try load from CDN tags already present
     const check = setInterval(() => { if (window.Tabulator) { clearInterval(check); buildTable(); } }, 100);
     setTimeout(() => clearInterval(check), 5000);
   }
-
-  // Build main categories table (after Tabulator ready)
-  const check2 = setInterval(() => { if (window.Tabulator) { clearInterval(check2); buildMainTable(); } }, 100);
-  setTimeout(() => clearInterval(check2), 5000);
 });

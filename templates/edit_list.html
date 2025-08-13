@@ -214,8 +214,8 @@
                     {title:'小カテゴリ', field:'sub_category_id', editor:subEditor, sorter:'number', validator:[{type:'required'}], mutatorData:(v)=>parseInt(v,10), minWidth:180,
                       formatter:(cell)=>{
                         const d = cell.getRow().getData();
-                        const color = d.main_color || '#64748b';
-                        const icon = d.main_icon || '💡';
+                        const color = d.sub_color || d.main_color || '#64748b';
+                        const icon = d.sub_icon || d.main_icon || '💡';
                         const name = d.sub_category_name || '';
                         return `<span class="cat-pill" style="background:${color}">${icon}</span> <span class="cat-name">${name}</span>`;
                       }
@@ -258,7 +258,7 @@
                         detail: data.detail || ''
                     })
                 }).then(async r=>{ if(!r.ok){ throw new Error(await r.text()); } return r.json(); })
-                  .then(j => { if (j.id){ row.update({id:j.id}); showAlert('保存しました。','success',1500);} })
+                  .then(j => { if (j.id){ row.update({id:j.id}); showAlert('保存しました。','success',1500); try{ const el=row.getElement&&row.getElement(); if(el) window.MOTION&&window.MOTION.pulseRow(el);}catch(e){} } })
                   .catch(err => showAlert('保存に失敗しました: '+err.message,'danger',5000));
             }
 
@@ -302,6 +302,8 @@
         reloadBtn.addEventListener('click', reloadTable);
         undoBtn.addEventListener('click', function(){ if(table){ table.undo(); }});
         redoBtn.addEventListener('click', function(){ if(table){ table.redo(); }});
+
+        // removed: others-since banner (moved to Add page)
 
         mainCategorySelect.addEventListener('change', () => {
             updateSubCategories();
