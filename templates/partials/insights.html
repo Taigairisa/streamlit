@@ -1,0 +1,16 @@
+{% if cards and cards|length > 0 %}
+<section class="insights mb-3">
+  {% for c in cards %}
+    <a class="card insight {{ 'up' if c.rate>0 else 'down' }}" href="{{ url_for('edit') }}?sub_category_id={{ c.sub_category_id }}&start_date={{ focus_month }}-01&end_date={{ focus_month }}-31">
+      {{ c.text }}
+    </a>
+  {% endfor %}
+</section>
+<style>
+  .insights{display:grid;gap:.5rem}
+  .insight{padding:.75rem 1rem;border:1px solid #e5e7eb;border-radius:.75rem;text-decoration:none;display:block;color:inherit}
+  .insight.up{border-color:#fecaca;background:#fff1f2}
+  .insight.down{border-color:#bbf7d0;background:#f0fdf4}
+  .insight:hover{filter:brightness(.98)}
+}</style>
+{% endif %}

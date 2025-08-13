@@ -1,22 +1,72 @@
 /* Custom styles for Kakeibo App */
 
-:root {
-    --color-primary: #7380ec;
-    --color-danger: #ff7782;
-    --color-success: #41f1b6;
-    --color-warning: #ffbb55;
-    --color-white: #fff;
-    --color-info-dark: #7d8da1;
-    --color-info-light: #dce1eb;
-    --color-dark: #363949;
-    --color-light: rgba(132, 139, 200, 0.18);
-    --color-background: #f6f6f9;
+/* Theme variables */
+:root,
+[data-theme="blue"] {
+  --color-primary: #3b82f6; /* blue */
+  --color-danger: #ef4444;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-white: #fff;
+  --color-info-dark: #64748b;
+  --color-info-light: #e2e8f0;
+  --color-dark: #111827;
+  --color-light: rgba(99, 102, 241, 0.12);
+  --color-background: #f6f6f9;
 
-    --card-border-radius: 1rem; /* Slightly less rounded than example */
-    --border-radius-1: 0.4rem;
-    --border-radius-2: 0.8rem;
+  --card-border-radius: 1rem;
+  --border-radius-1: 0.4rem;
+  --border-radius-2: 0.8rem;
 
-    --box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05); /* Lighter shadow */
+  --box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="pink"] {
+  --color-primary: #ec4899;
+  --color-danger: #f43f5e;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-info-dark: #6b7280;
+  --color-info-light: #fde2e7;
+  --color-dark: #111827;
+  --color-light: rgba(236, 72, 153, 0.12);
+  --color-background: #fff1f2;
+}
+
+[data-theme="orange"] {
+  --color-primary: #f97316;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-info-dark: #6b7280;
+  --color-info-light: #ffedd5;
+  --color-dark: #111827;
+  --color-light: rgba(249, 115, 22, 0.12);
+  --color-background: #fff7ed;
+}
+
+[data-theme="green"] {
+  --color-primary: #10b981;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-info-dark: #64748b;
+  --color-info-light: #dcfce7;
+  --color-dark: #111827;
+  --color-light: rgba(16, 185, 129, 0.12);
+  --color-background: #f0fdf4;
+}
+
+[data-theme="slate"] {
+  --color-primary: #64748b; /* tasteful slate */
+  --color-danger: #ef4444;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-info-dark: #475569;
+  --color-info-light: #e2e8f0;
+  --color-dark: #0f172a;
+  --color-light: rgba(100, 116, 139, 0.12);
+  --color-background: #f1f5f9;
 }
 
 body {
@@ -57,8 +107,7 @@ body {
 }
 
 .btn-primary:hover {
-    background-color: var(--color-primary-variant); /* Darker primary for hover */
-    border-color: var(--color-primary-variant);
+    filter: brightness(.95);
 }
 
 .btn-danger {
@@ -140,3 +189,22 @@ body {
 #topProgressCard select.form-select-sm {
     min-width: 9rem;
 }
+
+/* Theme picker */
+.theme-picker { padding: .5rem 1rem; }
+.theme-picker .swatch { width: 24px; height: 24px; border-radius: 9999px; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.1); cursor: pointer; display:inline-block; margin-right:.5rem; }
+.swatch.blue { background:#3b82f6; }
+.swatch.pink { background:#ec4899; }
+.swatch.orange { background:#f97316; }
+.swatch.green { background:#10b981; }
+.swatch.slate { background:#64748b; }
+.swatch.active { outline: 2px solid #0003; }
+
+/* Amount cell formatting */
+.amount-cell { font-variant-numeric: tabular-nums; text-align: right; display:inline-block; min-width: 6ch; }
+.amount-cell.exp { color: #b91c1c; }
+.amount-cell.inc { color: #047857; }
+
+/* Category pill */
+.cat-pill { width: 28px; height: 28px; border-radius: 9999px; display: inline-grid; place-items: center; color: #fff; font-size: 12px; margin-right: .35rem; vertical-align: middle; }
+.cat-name { vertical-align: middle; }

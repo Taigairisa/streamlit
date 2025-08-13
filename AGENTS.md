@@ -241,6 +241,13 @@
 - ルート `/` は `add` にリダイレクト。サイドバーの「ホーム」は `add` を指す。
 - カテゴリー管理を編集ページ同等のスプレッドシート UX に刷新。対応する JSON API を追加（上記参照）。
 
+### 2025-08-13 テーマ切替（UI）
+- 目的: 青（既定）、ピンク、オレンジ、緑、スレートのカラーテーマをUIから選択可能に。
+- 実装:
+  - CSS: `static/css/style.css` に `data-theme` ごとのCSS変数セットを追加（`blue/pink/orange/green/slate`）。
+  - UI: サイドバー下部にスウォッチ（円形ボタン）を表示（`partials/sidebar.html`）。
+  - JS: `static/js/theme.js` で `localStorage('ui_theme')` に保存し、`<html data-theme="...">` を切り替え。初期値は `blue`。
+
 ### 2025-08-13 TASK-001（UI）
 - 追加: stickyな月次ヘッダーを導入（左右月移動ボタン＋スワイプ対応）。
 - 表示: 残額、予測着地、日割り許容額、進捗バーを表示。
@@ -249,3 +256,30 @@
   - テンプレ: `templates/partials/month_header.html` を新設し、`base.html` 先頭にインクルード。
   - JS: `static/js/month-nav.js` で `month` クエリに基づく前後月遷移とモバイルスワイプを実装。
 - 備考: URLパラメータは既存仕様に合わせ `month=YYYY-MM` を維持。進捗バーは最大100%で安全に丸め。月移動ボタンは「前の月へ」「次の月へ」と明示テキストに変更し、44px最小タップ領域を確保。
+
+### 2025-08-13 TASK-002（UI）
+- 目的: 一覧の金額等幅・カテゴリ色/アイコン固定表示で可読性を改善。
+- スキーマ: `main_categories`/`sub_categories` に `color TEXT DEFAULT '#64748b'` と `icon TEXT DEFAULT '💡'` を追加（`ensure_aikotoba_schema()` 内で不足時自動付与）。
+- API: `/api/transactions` に大カテゴリの `main_color`/`main_icon` を追加（`JOIN main_categories`）。
+- API: `/api/main_categories`（GET/PATCH）を追加し、名称・色・アイコンをUIから編集可能に。
+- フロント: `templates/edit_list.html` のTabulator列を調整。
+  - 金額列: `formatter`で3桁区切り＋`tabular-nums`、`type`に応じて色分け（収入=緑、支出=赤）。
+  - 小カテゴリ列: 大カテゴリの色/アイコンを使用したピル＋名称を表示（編集は従来通りセレクト）。
+- カテゴリーUI: `templates/categories_list.html` に大カテゴリ編集カードを追加し、`static/js/categories.js` でTabulatorにより `name/color/icon` を直接編集。
+- スタイル: `static/css/style.css` に `.amount-cell`, `.cat-pill`, `.cat-name` を追加。
+
+### 2025-08-13 TASK-003（UI）
+- 目的: 入力フローの無摩擦化（MRUピル、Enter遷移、金額フォーマット）。
+- 追加: `static/js/input-flow.js` を追加し、追加画面の入力順（金額→カテゴリ→日付→メモ）にEnterで遷移、MRU 3件のカテゴリピル表示（localStorage）、金額のリアルタイム3桁区切り（送信時は数値化）。
+- テンプレ: `templates/add.html` にMRUエリア（`#mruCats`）を追加、IDを `amount/category/date/memo` に整理し、スクリプトを読み込み。
+- 適用拡張: `templates/edit_transaction.html` にも同フロー（MRU表示、Enter遷移、金額フォーマット）を適用。サーバ側も同様に金額を正規化して更新。
+- サーバ: `/add` POSTで `amount` を数値化して保存（カンマ等の装飾を除去）。
+
+### 2025-08-13 TASK-004（分析）
+- 目的: グラフを見なくても“何が増減したか”を一読で把握。
+- サーバ: `services/insights.py` を追加し、`build_insights_cards(engine, ym, aid)` でサブカテゴリ別の支出合計を当月・先月・前年同月で集計。`delta_card` で±10%以上のみ自然文カード化し、比較対象の月（例: `先月比（2025-07 vs 2025-08）`）を明示。
+- 画面: `/graphs` で対象月（レンジの終了月）を `focus_month` としてカード生成し、カードはグラフの下に表示。クリックで編集一覧に該当サブカテゴリ＋当月日付範囲を付与して遷移。
+- 備考: 表示件数は影響の大きい上位6件に絞り、文言は「先月比/前年比（比較月 vs 対象月）: {サブカテゴリ名} ±X%（±¥Y）」の形式。
+### 2025-08-13 TASK-005（撤回）
+- 理由: 招待/通知の実装によりパフォーマンス劣化が見られたため全面ロールバック。
+- 状態: コード・テンプレから招待/QR/SSEを削除。既存DBに `invites`/`events` が残存しても動作に影響なし（新規作成もしない）。

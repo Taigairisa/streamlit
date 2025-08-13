@@ -68,6 +68,13 @@ def ensure_aikotoba_schema():
             if not _column_exists(conn, table, "aikotoba_id"):
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN aikotoba_id INTEGER"))
 
+        # UI metadata columns for categories (color/icon)
+        for table in ("main_categories", "sub_categories"):
+            if not _column_exists(conn, table, "color"):
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN color TEXT DEFAULT '#64748b'"))
+            if not _column_exists(conn, table, "icon"):
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN icon TEXT DEFAULT '💡'"))
+
         # seed nitome aikotoba
         nitome_code = "nitome"
         nitome_label = "ニトメ"
@@ -83,6 +90,8 @@ def ensure_aikotoba_schema():
         # backfill NULL aikotoba_id with nitome (for existing data)
         for table in ("users", "main_categories", "sub_categories", "transactions"):
             conn.execute(text(f"UPDATE {table} SET aikotoba_id = :did WHERE aikotoba_id IS NULL"), {"did": nitome_id})
+
+        # invites/events creation removed (rollback of TASK-005)
 
 
 def get_aikotoba_id(code: str) -> int:

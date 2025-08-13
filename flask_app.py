@@ -28,6 +28,7 @@ from dateutil.relativedelta import relativedelta
 import pytz
 # Note: Heavy libs (pandas, altair) are imported lazily in routes that need them
 from utils.budget import month_context
+from services.insights import build_insights_cards
 
 app = Flask(__name__)
 # Minimal secret key for session (override via env in production)
@@ -57,6 +58,10 @@ def _is_api_request() -> bool:
         return request.path.startswith('/api/')
     except Exception:
         return False
+
+def _emit_event(conn, message: str):
+    aid = _get_current_user_aikotoba_id()
+    conn.execute(text("INSERT INTO events (aikotoba_id, message) VALUES (:aid, :m)"), {"aid": aid, "m": message})
 
 @app.before_request
 def require_login_guard():
@@ -184,8 +189,12 @@ def add():
         sub_category_id = request.form['sub_category_id']
         transaction_date = request.form['date']
         transaction_type = request.form['type']
-        detail = request.form['detail']
-        amount = request.form['amount']
+        detail = request.form.get('detail', '')
+        raw_amount = request.form['amount']
+        try:
+            amount = int(''.join(ch for ch in raw_amount if (ch.isdigit() or ch == '-')) or '0')
+        except Exception:
+            amount = 0
 
         with engine.begin() as conn:
             # derive aikotoba from sub_category
@@ -285,7 +294,9 @@ def api_get_transactions():
         SELECT
             t.id, t.date, t.detail, t.type, t.amount,
             t.sub_category_id,
-            sc.name as sub_category_name, mc.id as main_category_id, mc.name as main_category_name
+            sc.name as sub_category_name,
+            mc.id as main_category_id, mc.name as main_category_name,
+            mc.color as main_color, mc.icon as main_icon
         FROM transactions t
         JOIN sub_categories sc ON t.sub_category_id = sc.id
         JOIN main_categories mc ON sc.main_category_id = mc.id
@@ -343,6 +354,10 @@ def api_create_transaction():
             },
         )
         new_id = result.lastrowid
+        try:
+            pass
+        except Exception:
+            pass
     return jsonify({"id": new_id}), 201
 
 
@@ -359,6 +374,11 @@ def api_update_transaction(transaction_id: int):
     fields['aid'] = _get_current_user_aikotoba_id()
     with engine.begin() as conn:
         res = conn.execute(text(f"UPDATE transactions SET {set_clause} WHERE id = :id AND aikotoba_id = :aid"), fields)
+        if res.rowcount:
+            try:
+                pass
+            except Exception:
+                pass
     return jsonify({"updated": res.rowcount})
 
 
@@ -367,6 +387,10 @@ def api_delete_transaction(transaction_id: int):
     engine = connect_db()
     with engine.begin() as conn:
         res = conn.execute(text("DELETE FROM transactions WHERE id = :id AND aikotoba_id = :aid"), {"id": transaction_id, "aid": _get_current_user_aikotoba_id()})
+        try:
+            pass
+        except Exception:
+            pass
     return jsonify({"deleted": res.rowcount})
 
 @app.route('/dev', methods=['GET', 'POST'])
@@ -653,8 +677,12 @@ def edit_transaction(transaction_id):
         sub_category_id = request.form['sub_category_id']
         transaction_date = request.form['date']
         transaction_type = request.form['type']
-        detail = request.form['detail']
-        amount = request.form['amount']
+        detail = request.form.get('detail', '')
+        raw_amount = request.form['amount']
+        try:
+            amount = int(''.join(ch for ch in raw_amount if (ch.isdigit() or ch == '-')) or '0')
+        except Exception:
+            amount = 0
 
         with engine.begin() as conn:
             conn.execute(
@@ -787,6 +815,12 @@ def graphs():
         selected_start = None
         selected_end = None
 
+    # Determine a focus month for insights (use end of range or latest available)
+    if month_options:
+        focus_month = selected_end or month_options[-1]
+    else:
+        focus_month = datetime.now(pytz.timezone('Asia/Tokyo')).strftime('%Y-%m')
+
     # Prepare data for Chart.js
     if not monthly_summary_df.empty:
         labels = monthly_summary_df['month'].dt.strftime('%Y-%m').tolist()
@@ -801,12 +835,18 @@ def graphs():
         'cumulative': cumulative_values,
     })
 
+    # Build insight cards (先月比/前年比、支出ベース)
+    engine = connect_db()
+    cards = build_insights_cards(engine, focus_month, aid, threshold=10)
+
     return render_template(
         'graphs.html',
         chart_data=chart_data,
         month_options=month_options,
         selected_start_month=selected_start,
         selected_end_month=selected_end,
+        cards=cards,
+        focus_month=focus_month,
         **get_sidebar_data(selected_month=request.args.get('month'))
     )
 
@@ -865,6 +905,10 @@ def api_create_sub_category():
             "INSERT INTO sub_categories (main_category_id, name, aikotoba_id) VALUES (:mid, :name, :aid)"
         ), {"mid": mid, "name": name, "aid": aid})
         new_id = res.lastrowid
+        try:
+            pass
+        except Exception:
+            pass
     return jsonify({"id": new_id}), 201
 
 
@@ -886,6 +930,11 @@ def api_update_sub_category(sub_id: int):
     fields['id'] = sub_id
     with engine.begin() as conn:
         r = conn.execute(text(f"UPDATE sub_categories SET {set_clause} WHERE id = :id"), fields)
+        if r.rowcount:
+            try:
+                pass
+            except Exception:
+                pass
     return jsonify({"updated": r.rowcount})
 
 
@@ -895,7 +944,50 @@ def api_delete_sub_category(sub_id: int):
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM transactions WHERE sub_category_id = :sid"), {"sid": sub_id})
         r = conn.execute(text("DELETE FROM sub_categories WHERE id = :sid"), {"sid": sub_id})
+        if r.rowcount:
+            try:
+                pass
+            except Exception:
+                pass
     return jsonify({"deleted": r.rowcount})
+
+# ===== Main-category JSON API (for color/icon editing) =====
+
+@app.get('/api/main_categories')
+def api_get_main_categories():
+    engine = connect_db()
+    aid = _get_current_user_aikotoba_id()
+    query = "SELECT id, name, color, icon FROM main_categories WHERE aikotoba_id = :aid ORDER BY id ASC"
+    with engine.connect() as conn:
+        rows = conn.execute(text(query), {"aid": aid}).mappings().all()
+        data = [dict(r) for r in rows]
+    return jsonify(data)
+
+
+@app.patch('/api/main_categories/<int:main_id>')
+def api_update_main_category(main_id: int):
+    engine = connect_db()
+    payload = request.get_json(force=True, silent=True) or {}
+    allowed = {'name', 'color', 'icon'}
+    fields = {k: payload[k] for k in allowed if k in payload}
+    if not fields:
+        return jsonify({"error": "更新対象フィールドがありません"}), 400
+    set_clause = ", ".join([f"{k} = :{k}" for k in fields.keys()])
+    fields['id'] = main_id
+    fields['aid'] = _get_current_user_aikotoba_id()
+    with engine.begin() as conn:
+        r = conn.execute(text(f"UPDATE main_categories SET {set_clause} WHERE id = :id AND aikotoba_id = :aid"), fields)
+    return jsonify({"updated": r.rowcount})
+
+## SSE removed per rollback request
+
+
+# ===== Invites (QR招待) =====
+
+## QR invite helpers removed
+
+
+# Invites feature removed due to performance concerns.
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
