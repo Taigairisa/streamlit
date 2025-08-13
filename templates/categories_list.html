@@ -7,8 +7,7 @@
 {% endblock %}
 
 {% block content %}
-    <link href="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
-    <link href="https://unpkg.com/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+    <!-- Tabulator removed: using lightweight editable table -->
 
     <div class="card mb-4">
         <div class="card-header">フィルター</div>
@@ -43,14 +42,47 @@
     <div class="d-flex justify-content-between align-items-center mb-2">
         <div class="btn-group">
             <button id="catAddRowBtn" class="btn btn-sm btn-primary">小カテゴリを追加</button>
+            <button id="catApplyBtn" class="btn btn-sm btn-warning">変更を適用</button>
             <button id="catReloadBtn" class="btn btn-sm btn-outline-secondary">再読込</button>
-            <button id="catUndoBtn" class="btn btn-sm btn-outline-secondary">元に戻す</button>
-            <button id="catRedoBtn" class="btn btn-sm btn-outline-secondary">やり直す</button>
         </div>
-        <div><small class="text-muted" id="catTableInfo"></small></div>
+        <div><small class="text-muted" id="catTableInfo"></small> <span class="badge text-bg-warning" id="catDirtyBadge" hidden>未保存の変更あり</span></div>
     </div>
     <div id="catAlertArea"></div>
-    <div id="categoriesGrid"></div>
+    <div id="categoriesGrid">
+        <div class="table-responsive">
+            <table class="table table-sm align-middle data-grid" id="categoriesTable">
+                <thead>
+                    <tr>
+                        <th style="width:70px">ID</th>
+                        <th style="min-width:160px">大カテゴリ</th>
+                        <th style="min-width:200px">小カテゴリ名</th>
+                        <th style="min-width:120px">アイコン</th>
+                        <th style="width:90px">操作</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Confirm modal -->
+    <div class="modal fade" id="applyConfirmModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">変更内容の確認</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="applySummary"></div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+            <button type="button" class="btn btn-warning" id="applyConfirmBtn">変更を適用</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 大カテゴリ編集UIは廃止し、小カテゴリ側で管理します -->
 
@@ -58,7 +90,5 @@
 
 {% block scripts %}
     <script id="mainCategoriesData" type="application/json">{{ main_categories | tojson }}</script>
-    <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
-    <script src="https://unpkg.com/tabulator-tables/dist/js/tabulator.min.js"></script>
-    <script src="{{ url_for('static', filename='js/categories.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/categories_lite.js') }}"></script>
 {% endblock %}

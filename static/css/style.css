@@ -221,3 +221,19 @@ body {
   --color-dark: #e5e7eb;       /* text */
   --color-info-light: #334155; /* subtle borders/backgrounds */
 }
+
+/* Data-grid (Excel/st.data_editor-like) */
+.data-grid { border: 1px solid var(--color-info-light); border-collapse: separate; border-spacing: 0; width: 100%; background: var(--color-white); }
+.data-grid thead th { position: sticky; top: 0; z-index: 1; background: var(--color-white); border-bottom: 1px solid var(--color-info-light); font-weight: 500; }
+.data-grid th, .data-grid td { border-right: 1px solid var(--color-info-light); padding: .25rem .4rem; vertical-align: middle; line-height: 1.2; }
+.data-grid tr:last-child td { border-bottom: 1px solid var(--color-info-light); }
+.data-grid tr:hover td { background: rgba(0,0,0,.02); }
+.data-grid input.form-control-sm, .data-grid select.form-select-sm { border: 1px solid transparent; border-radius: 0; padding: .2rem .35rem; height: 28px; min-height: 28px; }
+.data-grid input.form-control-sm:focus, .data-grid select.form-select-sm:focus { border-color: var(--color-primary); box-shadow: none; }
+.data-grid select.form-select-sm { background-position: right .35rem center; padding-right: 1.2rem; }
+
+@media (max-width: 576px) {
+  .data-grid th, .data-grid td { padding: .2rem .3rem; line-height: 1.15; }
+  .data-grid input.form-control-sm, .data-grid select.form-select-sm { padding: .18rem .3rem; height: 26px; min-height: 26px; font-size: .9rem; }
+}
+.data-grid .amount-cell { font-variant-numeric: tabular-nums; text-align: right; }
