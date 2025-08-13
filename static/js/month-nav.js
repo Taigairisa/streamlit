@@ -36,6 +36,17 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener(
     'touchend',
     (e) => {
+      const target = e.target;
+      // Check if the touch originated from an interactive form element, inside a form, or inside a scrollable container
+      const isInteractiveOrFormElement = target.matches('input, select, textarea, button, a') || target.closest('form');
+      const isScrollableContainer = target.closest('[style*="overflow-x: scroll"], [style*="overflow-x: auto"], [style*="overflow: scroll"], [style*="overflow: auto"]');
+
+      if (isInteractiveOrFormElement || isScrollableContainer) {
+        // If touch originated inside an interactive element, a form, or a scrollable area,
+        // assume it's for element interaction or scrolling, and do not trigger month navigation.
+        return;
+      }
+
       const dx = e.changedTouches[0].clientX - sx;
       if (Math.abs(dx) > 60) gotoMonth(dx < 0 ? 1 : -1);
     },
