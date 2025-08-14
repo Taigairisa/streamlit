@@ -25,7 +25,7 @@
         </div>
 
         <div class="mb-3">
-            <label for="category" class="form-label d-flex align-items-center gap-2">小カテゴリ <span id="subIconDisplay" class="cat-pill" style="font-size:1.0rem; width: 24px; height:24px;"></span></label>
+            <label for="category" class="form-label">小カテゴリ</label>
             <select class="form-select" id="category" name="sub_category_id" required>
                 <!-- Options will be populated by JavaScript -->
             </select>
@@ -63,70 +63,68 @@
         const subCategorySelect = document.getElementById('category');
         const subCategories = {{ sub_categories | tojson }};
 
+        // Build a map of main_category_id -> name from the current main select (kept undecorated)
+        function buildMainNameMap(){
+          const m = {};
+          Array.from(mainCategorySelect.options).forEach(o=>{ if(o.value) m[parseInt(o.value,10)] = o.textContent; });
+          return m;
+        }
+        const MAIN_NAME_BY_ID = buildMainNameMap();
+
+        function getMainColor(mid){
+          const name = MAIN_NAME_BY_ID[mid] || '';
+          // generateColorFromString is defined globally in static/js/main.js
+          try { return generateColorFromString(name); } catch (_) { return '#64748b'; }
+        }
+
         function updateSubCategories() {
             const selectedMainCategoryId = parseInt(mainCategorySelect.value, 10);
             subCategorySelect.innerHTML = ''; // Clear existing options
 
+            const color = getMainColor(selectedMainCategoryId);
+            const opts = [];
             subCategories.forEach(sub => {
                 if (sub[1] === selectedMainCategoryId) {
                     const option = document.createElement('option');
                     option.value = sub[0];
-                    option.textContent = sub[2]; // Name
-                    option.dataset.icon = sub[4]; // Store icon
-                    option.dataset.color = sub[3]; // Store color
-                    // Display icon in text content (e.g., "食費 (パンの絵文字)")
-                    option.textContent = `${sub[2]} ${sub[4] || ''}`.trim();
-                    subCategorySelect.appendChild(option);
+                    option.textContent = `${sub[3] || ''} ${sub[2]}`.trim(); // icon + name
+                    option.style.color = color; // tint the option text with main color
+                    opts.push(option);
                 }
             });
-            // Update icon pill and color when main changes
-            updateIcon();
+            // Append and update the header badge to first item
+            opts.forEach(o=> subCategorySelect.appendChild(o));
+            if (opts.length){ subCategorySelect.value = opts[0].value; }
         }
 
         mainCategorySelect.addEventListener('change', updateSubCategories);
-        // Initial population
-        document.addEventListener('DOMContentLoaded', updateSubCategories);
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Keep main select plain (no decoration)
+            updateSubCategories();
 
-        // Icon for selected subcategory (fetch presets)
-        let subMap = {};
-        // Main category color mapping by ID
-        const mainColorById = {};
-        const mainCategoriesData = {{ main_categories | tojson }}; // Get main categories data from Flask
-        (function buildMainColors(){
-          try {
-            mainCategoriesData.forEach(mainCat => {
-              mainColorById[String(mainCat[0])] = mainCat[2]; // mainCat[0] is id, mainCat[2] is color
-            });
-          } catch(_){}
-        })();
-        async function fetchSubMeta(){
-          try{
-            const res = await fetch('/api/sub_categories');
-            if(!res.ok) return;
-            const list = await res.json();
-            subMap = Object.fromEntries(list.map(r=>[String(r.id), {icon:r.icon||'💡', color:r.color||'#64748b'}]));
-            updateIcon();
-          }catch(_){ }
-        }
-        function updateIcon(){
-          const sel = document.getElementById('category');
-          const disp = document.getElementById('subIconDisplay');
-          if(!sel || !disp) return;
-          const meta = subMap[String(sel.value)] || null;
-          disp.textContent = meta ? meta.icon : '';
-          // apply background color from selected main category
-          const mid = document.getElementById('mainCategorySelect')?.value || '';
-          const bg = mainColorById[String(mid)] || '#64748b';
-          disp.style.background = meta ? bg : 'transparent';
-          disp.style.color = meta ? '#fff' : 'inherit'; // Icon color
-          // Add border for the circle effect
-          disp.style.border = meta ? `1px solid ${bg}` : 'none';
-          disp.style.borderRadius = '50%'; // Make it a circle
-          disp.style.display = 'inline-grid'; // For centering icon
-          disp.style.placeItems = 'center'; // For centering icon
-        }
-        document.getElementById('category').addEventListener('change', updateIcon);
-        fetchSubMeta();
+            const sinceOpenBtn = document.getElementById('sinceOpen');
+            if(sinceOpenBtn) {
+                sinceOpenBtn.addEventListener('click', ()=>{
+                    const m = document.getElementById('sinceMenu'); m.hidden = !m.hidden;
+                });
+            }
+            fetchOthersSinceMyLast();
+            scheduleSince();
+
+            const typeSel = document.getElementById('typeSelect');
+            const amt = document.getElementById('amount');
+            function applyTypeColor(){
+              const v = (typeSel && typeSel.value) || '';
+              if(!amt) return;
+              amt.classList.remove('type-exp','type-inc','type-bud');
+              if(v==='支出') amt.classList.add('type-exp');
+              else if(v==='収入') amt.classList.add('type-inc');
+              else if(v==='予算') amt.classList.add('type-bud');
+            }
+            typeSel?.addEventListener('change', applyTypeColor);
+            applyTypeColor();
+        });
 
         // ---- Others since my last (banner) ----
         async function fetchOthersSinceMyLast(scope='month', limit=5){
@@ -156,28 +154,9 @@
                 </div>
             `).join('') || '<div class="text-muted">新しい追加はありません。</div>';
         }
-        document.getElementById('sinceOpen').addEventListener('click', ()=>{
-            const m = document.getElementById('sinceMenu'); m.hidden = !m.hidden;
-        });
         let sinceTimer;
         function scheduleSince(ms=45000){ clearInterval(sinceTimer); sinceTimer = setInterval(()=>{ if(!document.hidden) fetchOthersSinceMyLast(); }, ms); }
         document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) fetchOthersSinceMyLast(); });
-        fetchOthersSinceMyLast();
-        scheduleSince();
-
-        // Type colorization for amount field
-        const typeSel = document.getElementById('typeSelect');
-        const amt = document.getElementById('amount');
-        function applyTypeColor(){
-          const v = (typeSel && typeSel.value) || '';
-          if(!amt) return;
-          amt.classList.remove('type-exp','type-inc','type-bud');
-          if(v==='支出') amt.classList.add('type-exp');
-          else if(v==='収入') amt.classList.add('type-inc');
-          else if(v==='予算') amt.classList.add('type-bud');
-        }
-        typeSel?.addEventListener('change', applyTypeColor);
-        applyTypeColor();
     </script>
     <style>
       .mru{display:flex;gap:.5rem;margin:.5rem 0}

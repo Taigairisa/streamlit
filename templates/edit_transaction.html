@@ -59,18 +59,33 @@
         const allSubCategories = {{ all_sub_categories | tojson }};
         const initialSubCategoryId = {{ transaction.sub_category_id }};
 
+        function generateColorFromString(str) {
+          if (!str) return '#64748b';
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); hash |= 0; }
+          const hue = Math.abs(hash % 360);
+          return `hsl(${hue}, 70%, 50%)`;
+        }
+
+        function buildMainNameMap(){
+          const m = {};
+          Array.from(mainCategorySelect.options).forEach(o=>{ if(o.value) m[parseInt(o.value,10)] = o.textContent; });
+          return m;
+        }
+        const MAIN_NAME_BY_ID = buildMainNameMap();
+
         function updateSubCategories() {
             const selectedMainCategoryId = parseInt(mainCategorySelect.value, 10);
-            subCategorySelect.innerHTML = ''; // Clear existing options
+            subCategorySelect.innerHTML = '';
 
+            const color = generateColorFromString(MAIN_NAME_BY_ID[selectedMainCategoryId] || '');
             allSubCategories.forEach(sub => {
                 if (sub[1] === selectedMainCategoryId) {
                     const option = document.createElement('option');
                     option.value = sub[0];
-                    option.textContent = sub[2];
-                    if (sub[0] === initialSubCategoryId) {
-                        option.selected = true;
-                    }
+                    option.textContent = `${sub[3] || ''} ${sub[2]}`.trim();
+                    option.style.color = color;
+                    if (sub[0] === initialSubCategoryId) option.selected = true;
                     subCategorySelect.appendChild(option);
                 }
             });

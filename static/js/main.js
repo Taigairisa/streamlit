@@ -52,3 +52,15 @@ document.addEventListener('DOMContentLoaded', function () {
     updateArrow();
   }
 });
+
+// Helper to generate a consistent color from a string (e.g., category name)
+function generateColorFromString(str) {
+  if (!str) return '#64748b'; // Default color for empty/null string
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    hash |= 0; // Ensure 32bit integer
+  }
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 70%, 50%)`;
+}

@@ -68,10 +68,8 @@ def ensure_aikotoba_schema():
             if not _column_exists(conn, table, "aikotoba_id"):
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN aikotoba_id INTEGER"))
 
-        # UI metadata columns for categories (color/icon)
+        # UI metadata columns for categories (icon)
         for table in ("main_categories", "sub_categories"):
-            if not _column_exists(conn, table, "color"):
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN color TEXT DEFAULT '#64748b'"))
             if not _column_exists(conn, table, "icon"):
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN icon TEXT DEFAULT '💡'"))
 
@@ -162,12 +160,12 @@ def get_categories(engine=None, aikotoba_id: int | None = None):
         where = " WHERE aikotoba_id = :aid"
         params = {"aid": aikotoba_id}
     with engine.connect() as conn:
-        mains = conn.execute(text(f"SELECT id, name, color FROM main_categories{where}"), params).fetchall()
-        subs = conn.execute(text(f"SELECT id, main_category_id, name, color, icon FROM sub_categories{where}"), params).fetchall()
+        mains = conn.execute(text(f"SELECT id, name FROM main_categories{where}"), params).fetchall()
+        subs = conn.execute(text(f"SELECT id, main_category_id, name, icon FROM sub_categories{where}"), params).fetchall()
     # Convert to list of tuples for UI compatibility
-    main_categories = [(m[0], m[1], m[2]) for m in mains]
-    # sub_categories will now be (id, main_category_id, name, color, icon)
-    sub_categories = [(s[0], s[1], s[2], s[3], s[4]) for s in subs]
+    main_categories = [(m[0], m[1]) for m in mains]
+    # sub_categories will now be (id, main_category_id, name, icon)
+    sub_categories = [(s[0], s[1], s[2], s[3]) for s in subs]
     return main_categories, sub_categories
 
 

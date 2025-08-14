@@ -39,17 +39,18 @@ document.addEventListener('DOMContentLoaded', function(){
   const subJson = document.getElementById('subCategoriesData');
   const allSub = subJson ? JSON.parse(subJson.textContent||'[]') : [];
   const subOptionsByMain = {}; const subToMain = {}; const subName = {};
-  for (const [sid, mid, name, color, icon] of allSub){
+  for (const [sid, mid, name, icon] of allSub){
     if (!subOptionsByMain[mid]) subOptionsByMain[mid] = [];
-    subOptionsByMain[mid].push([sid, name, color, icon]);
-    subToMain[sid] = mid; subName[sid] = name;
+    subOptionsByMain[mid].push([sid, name, icon]);
+    subToMain[sid] = mid; 
+    subName[sid] = name;
   }
 
   const mainJson = document.getElementById('mainCategoriesData');
   const allMain = mainJson ? JSON.parse(mainJson.textContent||'[]') : [];
-  const mainColorById = {};
-  allMain.forEach(([mid, name, color]) => {
-    mainColorById[String(mid)] = color;
+  const mainNameById = {};
+  allMain.forEach(([mid, name]) => {
+    mainNameById[String(mid)] = name;
   });
 
   function showAlert(msg, type='warning', timeout=3000){
@@ -70,8 +71,14 @@ document.addEventListener('DOMContentLoaded', function(){
   function updateSubFilter(){
     const mid = parseInt(mainSel.value||'0',10);
     subSel.innerHTML = '';
-    (subOptionsByMain[mid]||[]).forEach(([sid,name])=>{
-      const o = document.createElement('option'); o.value=sid; o.textContent=name; subSel.appendChild(o);
+    const mainName = mainNameById[String(mid)] || '';
+    const color = generateColorFromString(mainName);
+    (subOptionsByMain[mid]||[]).forEach(([sid,name,icon])=>{
+      const o = document.createElement('option');
+      o.value = sid;
+      o.textContent = `${icon || ''} ${name}`.trim();
+      o.style.color = color;
+      subSel.appendChild(o);
     });
   }
 
@@ -106,9 +113,6 @@ document.addEventListener('DOMContentLoaded', function(){
 
   function render(){
     tbody.innerHTML='';
-    const mid = parseInt(mainSel.value||'0',10);
-    const subChoices = subOptionsByMain[mid]||[];
-    const nf = new Intl.NumberFormat('ja-JP');
     rows.forEach(r=>{
       if (deleted.has(r.id)) return;
       const tr = document.createElement('tr'); tr.dataset.rowId = String(r.id);
@@ -122,43 +126,72 @@ document.addEventListener('DOMContentLoaded', function(){
       // Type
       const tdType = document.createElement('td'); const selT = document.createElement('select'); selT.className='form-select form-select-sm'; ['支出','収入','予算'].forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; selT.appendChild(o); }); selT.value=r.type||'支出'; selT.addEventListener('change',()=>{ r.type=selT.value; markDirty(); }); tdType.appendChild(selT); tr.appendChild(tdType);
       // Amount
-      const tdAmt = document.createElement('td'); const inAmt = document.createElement('input'); inAmt.type='text'; inAmt.inputMode='numeric'; inAmt.className='form-control form-control-sm'; inAmt.value = (r.amount!=null)? nf.format(r.amount):''; inAmt.addEventListener('input',()=>{ const raw=(inAmt.value||'').replace(/[^\d\-]/g,''); if(!raw){ r.amount=null; inAmt.value=''; markDirty(); return;} const num=Number(raw); if(!Number.isNaN(num)){ inAmt.value=nf.format(num); r.amount=num; markDirty(); } }); tdAmt.appendChild(inAmt); tr.appendChild(tdAmt);
-      // Sub-category
+      const tdAmt = document.createElement('td'); const inAmt = document.createElement('input'); inAmt.type='text'; inAmt.inputMode='numeric'; inAmt.className='form-control form-control-sm'; inAmt.value = (r.amount!=null)? new Intl.NumberFormat('ja-JP').format(r.amount):''; inAmt.addEventListener('input',()=>{ const raw=(inAmt.value||'').replace(/[^\d\-]/g,''); if(!raw){ r.amount=null; inAmt.value=''; markDirty(); return;} const num=Number(raw); if(!Number.isNaN(num)){ inAmt.value=new Intl.NumberFormat('ja-JP').format(num); r.amount=num; markDirty(); } }); tdAmt.appendChild(inAmt); tr.appendChild(tdAmt);
+      
+      // Sub-category Display
       const tdSub = document.createElement('td');
-      const selS = document.createElement('select');
-      selS.className = 'form-select form-select-sm';
-      subChoices.forEach(([sid, name, color, icon]) => {
-        const o = document.createElement('option');
-        o.value = sid;
-        // Create a span for the icon with main category color
-        const mainCatId = subToMain[sid]; // Get main category ID for this sub-category
-        const mainColor = mainColorById[String(mainCatId)] || '#64748b'; // Default color
-        
-        const iconSpan = document.createElement('span');
-        iconSpan.textContent = icon || '';
-        iconSpan.style.backgroundColor = mainColor;
-        iconSpan.style.color = '#fff'; // White icon color
-        iconSpan.style.borderRadius = '50%';
-        iconSpan.style.width = '1.2em';
-        iconSpan.style.height = '1.2em';
-        iconSpan.style.display = 'inline-grid';
-        iconSpan.style.placeItems = 'center';
-        iconSpan.style.marginRight = '0.3em';
-        iconSpan.style.verticalAlign = 'middle';
+      const buildDisplay = (subId) => {
+          const displayDiv = document.createElement('div');
+          displayDiv.className = 'd-flex align-items-center';
+          const subCategory = allSub.find(sc => sc[0] === subId);
+          if (subCategory) {
+              const mainCatId = subCategory[1];
+              const mainName = mainNameById[String(mainCatId)] || '';
+              const mainColor = generateColorFromString(mainName);
+              const icon = subCategory[3] || '';
+              const name = subCategory[2] || '';
 
-        // Append icon span and name to a temporary div to get innerHTML
-        const tempDiv = document.createElement('div');
-        tempDiv.appendChild(iconSpan);
-        tempDiv.appendChild(document.createTextNode(name));
-        o.innerHTML = tempDiv.innerHTML; // Set innerHTML to include styled span
+              const label = document.createElement('span');
+              label.textContent = `${icon ? icon + ' ' : ''}${name}`;
+              label.style.color = mainColor;
+              displayDiv.appendChild(label);
+          } else {
+              displayDiv.textContent = 'N/A';
+          }
+          return displayDiv;
+      };
 
-        selS.appendChild(o);
-      });
-      selS.value = r.sub_category_id || (subChoices[0]?.[0]||'');
-      selS.addEventListener('change',()=>{ r.sub_category_id=parseInt(selS.value,10); markDirty(); });
-      tdSub.appendChild(selS); tr.appendChild(tdSub);
+      const switchToEdit = () => {
+          tdSub.innerHTML = ''; // Clear current display
+          const selS = document.createElement('select');
+          selS.className = 'form-select form-select-sm';
+          
+          const currentMainCatId = subToMain[r.sub_category_id];
+          const subChoices = subOptionsByMain[currentMainCatId] || allSub.map(s => [s[0], s[2], s[3]]);
+          const mainName = mainNameById[String(currentMainCatId)] || '';
+          const color = generateColorFromString(mainName);
+          subChoices.forEach(([sid, name, icon]) => {
+              const o = document.createElement('option');
+              o.value = sid;
+              o.textContent = `${icon || ''} ${name}`.trim();
+              o.style.color = color;
+              selS.appendChild(o);
+          });
+          selS.value = r.sub_category_id;
+          tdSub.appendChild(selS);
+          selS.focus();
+
+          const confirmChange = () => {
+              const newSubId = parseInt(selS.value, 10);
+              if (r.sub_category_id !== newSubId) {
+                  r.sub_category_id = newSubId;
+                  markDirty();
+              }
+              tdSub.innerHTML = '';
+              tdSub.appendChild(buildDisplay(r.sub_category_id));
+              tdSub.addEventListener('click', switchToEdit, { once: true });
+          };
+
+          selS.addEventListener('change', confirmChange);
+          selS.addEventListener('blur', confirmChange);
+      };
+
+      tdSub.appendChild(buildDisplay(r.sub_category_id));
+      tdSub.addEventListener('click', switchToEdit, { once: true });
+      tr.appendChild(tdSub);
+
       // Ops
-      const tdOps = document.createElement('td'); tdOps.style.minWidth = '60px'; const delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-sm btn-outline-danger'; delBtn.textContent='削除'; delBtn.addEventListener('click',()=>{ if(!confirm('削除としてマークします。よろしいですか？')) return; if(r.id>0){ deleted.add(r.id);} else { rows=rows.filter(x=>x!==r);} render(); markDirty(); }); tdOps.appendChild(delBtn); tr.appendChild(tdOps);
+      const tdOps = document.createElement('td'); tdOps.style.minWidth = '100px'; const delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-sm btn-outline-danger'; delBtn.textContent='削除'; delBtn.addEventListener('click',()=>{ if(!confirm('削除としてマークします。よろしいですか？')) return; if(r.id>0){ deleted.add(r.id);} else { rows=rows.filter(x=>x!==r);} render(); markDirty(); }); tdOps.appendChild(delBtn); tr.appendChild(tdOps);
 
       tbody.appendChild(tr);
     });
@@ -285,4 +318,3 @@ document.addEventListener('DOMContentLoaded', function(){
   updateSubFilter();
   load();
 });
-

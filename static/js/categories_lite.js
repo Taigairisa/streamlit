@@ -36,11 +36,8 @@ document.addEventListener('DOMContentLoaded', function(){
   const mainCatsJson = document.getElementById('mainCategoriesData');
   const mainCategories = mainCatsJson ? JSON.parse(mainCatsJson.textContent || '[]') : [];
   const mainOptions = Object.fromEntries(mainCategories.map(c => [String(c[0]), c[1]])); // This is for main category select options
+  const mainNameById = Object.fromEntries(mainCategories.map(c => [String(c[0]), c[1]]));
 
-  const mainColorById = {};
-  mainCategories.forEach(([mid, name, color]) => { // mainCategories now contains color
-    mainColorById[String(mid)] = color;
-  });
 
   // Simple icon choices (emoji only)
   const ICON_CHOICES = ['💡','🍔','🛒','🚃','🚗','🏠','📱','🏥','🎉','🧾','💳','📦','🧺','🍽️','🍼','💼','🏫','🐾','🎁','💰','🧠','🏃','🧘','⚽','🎮','🎬','🎧','📚','✈️','🧳','⛽','🪑','🖥️','🥗','🍣','🍺','🍷','☕','🍞','🍰','💊','🧧','🐶','🐱','🧴','🧹','🧽','🏖️','🚌','🚕','🚲','🛏️','🔧','🗂️'];
@@ -110,27 +107,22 @@ document.addEventListener('DOMContentLoaded', function(){
         const opt = document.createElement('option'); opt.value = val; opt.textContent = label; sel.appendChild(opt);
       });
       sel.value = String(r.main_category_id || '');
-      sel.addEventListener('change', ()=>{ r.main_category_id = sel.value ? parseInt(sel.value,10) : null; markDirty(); });
+      sel.addEventListener('change', ()=>{ r.main_category_id = sel.value ? parseInt(sel.value,10) : null; markDirty(); render(); });
       tdMain.appendChild(sel); tr.appendChild(tdMain);
 
       // Name input
       const tdName = document.createElement('td');
-      const nameWrapper = document.createElement('div'); // Wrapper for icon and input
+      const nameWrapper = document.createElement('div'); // Wrapper for emoji and input
       nameWrapper.style.display = 'flex';
       nameWrapper.style.alignItems = 'center';
 
-      const iconSpan = document.createElement('span');
-      iconSpan.textContent = r.icon || '';
-      const mainColor = mainColorById[String(r.main_category_id)] || '#64748b'; // Get main category color
-      iconSpan.style.backgroundColor = mainColor;
-      iconSpan.style.color = '#fff'; // White icon color
-      iconSpan.style.borderRadius = '50%';
-      iconSpan.style.width = '1.5em'; // Slightly larger for visibility
-      iconSpan.style.height = '1.5em';
-      iconSpan.style.display = 'inline-grid';
-      iconSpan.style.placeItems = 'center';
-      iconSpan.style.marginRight = '0.5em';
-      iconSpan.style.flexShrink = '0'; // Prevent shrinking
+      const emojiSpan = document.createElement('span');
+      emojiSpan.textContent = r.icon || '';
+      emojiSpan.style.marginRight = '0.5em';
+      emojiSpan.style.flexShrink = '0';
+
+      const mainName = mainNameById[String(r.main_category_id)] || '';
+      const mainColor = generateColorFromString(mainName);
 
       const inp = document.createElement('input');
       inp.type = 'text';
@@ -138,8 +130,9 @@ document.addEventListener('DOMContentLoaded', function(){
       inp.value = r.name || ''; // Only name in the input field
       inp.addEventListener('input', () => { r.name = inp.value; markDirty(); });
       inp.style.flexGrow = '1'; // Allow input to grow
+      inp.style.color = mainColor; // Colorized text to match main category
 
-      nameWrapper.appendChild(iconSpan);
+      nameWrapper.appendChild(emojiSpan);
       nameWrapper.appendChild(inp);
       tdName.appendChild(nameWrapper);
       tr.appendChild(tdName);
@@ -149,12 +142,12 @@ document.addEventListener('DOMContentLoaded', function(){
       const ico = document.createElement('select'); ico.className='form-select form-select-sm';
       ICON_CHOICES.forEach(ic=>{ const o=document.createElement('option'); o.value=ic; o.textContent=ic; ico.appendChild(o); });
       ico.value = r.icon || ICON_CHOICES[0];
-      ico.addEventListener('change', ()=>{ r.icon = ico.value; markDirty(); });
+      ico.addEventListener('change', ()=>{ r.icon = ico.value; markDirty(); render(); });
       tdIcon.appendChild(ico); tr.appendChild(tdIcon);
 
       // Ops
       const tdOps = document.createElement('td');
-      tdOps.style.minWidth = '60px';
+      tdOps.style.minWidth = '100px';
       const delBtn = document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-sm btn-outline-danger'; delBtn.textContent='削除';
       delBtn.addEventListener('click', ()=>{
         if (!confirm('削除としてマークします。よろしいですか？')) return;

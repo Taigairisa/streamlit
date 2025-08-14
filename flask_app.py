@@ -318,9 +318,9 @@ def api_get_transactions():
         SELECT
             t.id, t.date, t.detail, t.type, t.amount,
             t.sub_category_id,
-            sc.name as sub_category_name, sc.color as sub_color, sc.icon as sub_icon,
+            sc.name as sub_category_name, sc.icon as sub_icon,
             mc.id as main_category_id, mc.name as main_category_name,
-            mc.color as main_color, mc.icon as main_icon
+            mc.icon as main_icon
         FROM transactions t
         JOIN sub_categories sc ON t.sub_category_id = sc.id
         JOIN main_categories mc ON sc.main_category_id = mc.id
@@ -923,7 +923,7 @@ def api_get_sub_categories():
 
     base_query = """
         SELECT sc.id, sc.name as sub_name, sc.main_category_id,
-               mc.name as main_name, sc.color as color, sc.icon as icon
+               mc.name as main_name, sc.icon as icon
           FROM sub_categories sc
           JOIN main_categories mc ON sc.main_category_id = mc.id
          WHERE 1 = 1
@@ -965,7 +965,6 @@ def api_get_sub_categories():
                 'name': r['sub_name'],
                 'main_category_id': r['main_category_id'],
                 'main_category_name': r['main_name'],
-                'color': r['color'],
                 'icon': r['icon'],
             }
             for r in rows
@@ -999,7 +998,7 @@ def api_create_sub_category():
 def api_update_sub_category(sub_id: int):
     engine = connect_db()
     payload = request.get_json(force=True, silent=True) or {}
-    allowed = {'name', 'main_category_id', 'color', 'icon'}
+    allowed = {'name', 'main_category_id', 'icon'}
     fields = {k: payload[k] for k in allowed if k in payload}
     if not fields:
         return jsonify({"error": "更新対象フィールドがありません"}), 400
@@ -1040,7 +1039,7 @@ def api_delete_sub_category(sub_id: int):
 def api_get_main_categories():
     engine = connect_db()
     aid = _get_current_user_aikotoba_id()
-    query = "SELECT id, name, color, icon FROM main_categories WHERE aikotoba_id = :aid ORDER BY id ASC"
+    query = "SELECT id, name, icon FROM main_categories WHERE aikotoba_id = :aid ORDER BY id ASC"
     with engine.connect() as conn:
         rows = conn.execute(text(query), {"aid": aid}).mappings().all()
         data = [dict(r) for r in rows]
@@ -1051,7 +1050,7 @@ def api_get_main_categories():
 def api_update_main_category(main_id: int):
     engine = connect_db()
     payload = request.get_json(force=True, silent=True) or {}
-    allowed = {'name', 'color', 'icon'}
+    allowed = {'name', 'icon'}
     fields = {k: payload[k] for k in allowed if k in payload}
     if not fields:
         return jsonify({"error": "更新対象フィールドがありません"}), 400
