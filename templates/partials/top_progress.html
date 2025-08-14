@@ -20,7 +20,7 @@
         {% for item in budget_progress %}
           <div class="mb-3">
             <div class="d-flex justify-content-between">
-              <strong>{{ item.category }}</strong>
+              <strong>{{ sub_icon_by_name.get(item.category, '') }} {{ item.category }}</strong>
               <span class="text-muted">{{ item.spent }}円 / {{ item.budget }}円</span>
             </div>
             <div class="progress" style="height: 8px;">

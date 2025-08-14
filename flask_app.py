@@ -64,6 +64,23 @@ def _emit_event(conn, message: str):
     aid = _get_current_user_aikotoba_id()
     conn.execute(text("INSERT INTO events (aikotoba_id, message) VALUES (:aid, :m)"), {"aid": aid, "m": message})
 
+def _get_sub_icon_by_name(aid: int) -> dict[str, str]:
+    """Return mapping of sub category name -> icon for given aikotoba.
+
+    Note: Name collision across mains is unlikely in typical data; if it occurs,
+    later rows will overwrite earlier ones, which is acceptable for label-only use.
+    """
+    try:
+        engine = connect_db()
+        with engine.connect() as conn:
+            rows = conn.execute(text("SELECT name, icon FROM sub_categories WHERE aikotoba_id = :aid"), {"aid": aid}).fetchall()
+        m = {}
+        for name, icon in rows:
+            m[str(name)] = str(icon or '')
+        return m
+    except Exception:
+        return {}
+
 @app.before_request
 def require_login_guard():
     # Exempt paths
@@ -177,7 +194,9 @@ def get_sidebar_data(selected_month=None):
         'total_spent': total_spent,
         'month_ctx': month_ctx,
         'gift_summary': gift_summary,
-        'unentered_amounts': unentered_amounts
+        'unentered_amounts': unentered_amounts,
+        # Sub-category icon mapping for top module labeling (emoji + name)
+        'sub_icon_by_name': _get_sub_icon_by_name(aid)
     }
 
 @app.route('/')

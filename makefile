@@ -2,6 +2,8 @@
 
 .PHONY: lint fix format typecheck run build  
 
+APP := kakeibo-flask
+CFG := fly.flask.toml
 PY = python3
 
 build:
@@ -45,3 +47,6 @@ docker-build-flask-legacy:
 docker-build-flask-clean:
 	-@docker builder prune -af >/dev/null 2>&1 || true
 	docker build --no-cache -t kakeibo-flask -f Dockerfile.flask .
+
+deploy:        ## fly deploy (local build)
+	flyctl deploy -c $(CFG) --local-only -a $(APP)
