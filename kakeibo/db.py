@@ -162,11 +162,12 @@ def get_categories(engine=None, aikotoba_id: int | None = None):
         where = " WHERE aikotoba_id = :aid"
         params = {"aid": aikotoba_id}
     with engine.connect() as conn:
-        mains = conn.execute(text(f"SELECT id, name FROM main_categories{where}"), params).fetchall()
-        subs = conn.execute(text(f"SELECT id, main_category_id, name FROM sub_categories{where}"), params).fetchall()
+        mains = conn.execute(text(f"SELECT id, name, color FROM main_categories{where}"), params).fetchall()
+        subs = conn.execute(text(f"SELECT id, main_category_id, name, color, icon FROM sub_categories{where}"), params).fetchall()
     # Convert to list of tuples for UI compatibility
-    main_categories = [(m[0], m[1]) for m in mains]
-    sub_categories = [(s[0], s[1], s[2]) for s in subs]
+    main_categories = [(m[0], m[1], m[2]) for m in mains]
+    # sub_categories will now be (id, main_category_id, name, color, icon)
+    sub_categories = [(s[0], s[1], s[2], s[3], s[4]) for s in subs]
     return main_categories, sub_categories
 
 

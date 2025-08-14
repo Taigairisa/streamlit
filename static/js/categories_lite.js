@@ -35,7 +35,12 @@ document.addEventListener('DOMContentLoaded', function(){
 
   const mainCatsJson = document.getElementById('mainCategoriesData');
   const mainCategories = mainCatsJson ? JSON.parse(mainCatsJson.textContent || '[]') : [];
-  const mainOptions = Object.fromEntries(mainCategories.map(c => [String(c[0]), c[1]]));
+  const mainOptions = Object.fromEntries(mainCategories.map(c => [String(c[0]), c[1]])); // This is for main category select options
+
+  const mainColorById = {};
+  mainCategories.forEach(([mid, name, color]) => { // mainCategories now contains color
+    mainColorById[String(mid)] = color;
+  });
 
   // Simple icon choices (emoji only)
   const ICON_CHOICES = ['💡','🍔','🛒','🚃','🚗','🏠','📱','🏥','🎉','🧾','💳','📦','🧺','🍽️','🍼','💼','🏫','🐾','🎁','💰','🧠','🏃','🧘','⚽','🎮','🎬','🎧','📚','✈️','🧳','⛽','🪑','🖥️','🥗','🍣','🍺','🍷','☕','🍞','🍰','💊','🧧','🐶','🐱','🧴','🧹','🧽','🏖️','🚌','🚕','🚲','🛏️','🔧','🗂️'];
@@ -110,9 +115,34 @@ document.addEventListener('DOMContentLoaded', function(){
 
       // Name input
       const tdName = document.createElement('td');
-      const inp = document.createElement('input'); inp.type='text'; inp.className='form-control form-control-sm'; inp.value = r.name || '';
-      inp.addEventListener('input', ()=>{ r.name = inp.value; markDirty(); });
-      tdName.appendChild(inp); tr.appendChild(tdName);
+      const nameWrapper = document.createElement('div'); // Wrapper for icon and input
+      nameWrapper.style.display = 'flex';
+      nameWrapper.style.alignItems = 'center';
+
+      const iconSpan = document.createElement('span');
+      iconSpan.textContent = r.icon || '';
+      const mainColor = mainColorById[String(r.main_category_id)] || '#64748b'; // Get main category color
+      iconSpan.style.backgroundColor = mainColor;
+      iconSpan.style.color = '#fff'; // White icon color
+      iconSpan.style.borderRadius = '50%';
+      iconSpan.style.width = '1.5em'; // Slightly larger for visibility
+      iconSpan.style.height = '1.5em';
+      iconSpan.style.display = 'inline-grid';
+      iconSpan.style.placeItems = 'center';
+      iconSpan.style.marginRight = '0.5em';
+      iconSpan.style.flexShrink = '0'; // Prevent shrinking
+
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'form-control form-control-sm';
+      inp.value = r.name || ''; // Only name in the input field
+      inp.addEventListener('input', () => { r.name = inp.value; markDirty(); });
+      inp.style.flexGrow = '1'; // Allow input to grow
+
+      nameWrapper.appendChild(iconSpan);
+      nameWrapper.appendChild(inp);
+      tdName.appendChild(nameWrapper);
+      tr.appendChild(tdName);
 
       // Icon select
       const tdIcon = document.createElement('td');

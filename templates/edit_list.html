@@ -105,6 +105,7 @@
 
 {% block scripts %}
     <script id="subCategoriesData" type="application/json">{{ sub_categories | tojson }}</script>
+    <script id="mainCategoriesData" type="application/json">{{ main_categories | tojson }}</script>
     <script src="{{ url_for('static', filename='js/edit_lite.js') }}"></script>
 {% endblock %}
 

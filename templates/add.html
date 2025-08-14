@@ -71,7 +71,11 @@
                 if (sub[1] === selectedMainCategoryId) {
                     const option = document.createElement('option');
                     option.value = sub[0];
-                    option.textContent = sub[2];
+                    option.textContent = sub[2]; // Name
+                    option.dataset.icon = sub[4]; // Store icon
+                    option.dataset.color = sub[3]; // Store color
+                    // Display icon in text content (e.g., "食費 (パンの絵文字)")
+                    option.textContent = `${sub[2]} ${sub[4] || ''}`.trim();
                     subCategorySelect.appendChild(option);
                 }
             });
@@ -85,15 +89,14 @@
 
         // Icon for selected subcategory (fetch presets)
         let subMap = {};
-        // Main category color mapping by ID (fixed palette, ID asc)
-        const MAIN_COLOR_PALETTE = ['#64748b','#3b82f6','#ec4899','#f97316','#10b981','#8b5cf6','#14b8a6','#f59e0b','#ef4444'];
+        // Main category color mapping by ID
         const mainColorById = {};
+        const mainCategoriesData = {{ main_categories | tojson }}; // Get main categories data from Flask
         (function buildMainColors(){
           try {
-            const options = Array.from(document.getElementById('mainCategorySelect').options);
-            // options include 'value' as id in the order rendered; sort numerically by value
-            const ids = options.map(o=>parseInt(o.value,10)).filter(n=>!Number.isNaN(n)).sort((a,b)=>a-b);
-            ids.forEach((id, idx)=>{ mainColorById[String(id)] = MAIN_COLOR_PALETTE[idx % MAIN_COLOR_PALETTE.length]; });
+            mainCategoriesData.forEach(mainCat => {
+              mainColorById[String(mainCat[0])] = mainCat[2]; // mainCat[0] is id, mainCat[2] is color
+            });
           } catch(_){}
         })();
         async function fetchSubMeta(){
@@ -115,7 +118,12 @@
           const mid = document.getElementById('mainCategorySelect')?.value || '';
           const bg = mainColorById[String(mid)] || '#64748b';
           disp.style.background = meta ? bg : 'transparent';
-          disp.style.color = meta ? '#fff' : 'inherit';
+          disp.style.color = meta ? '#fff' : 'inherit'; // Icon color
+          // Add border for the circle effect
+          disp.style.border = meta ? `1px solid ${bg}` : 'none';
+          disp.style.borderRadius = '50%'; // Make it a circle
+          disp.style.display = 'inline-grid'; // For centering icon
+          disp.style.placeItems = 'center'; // For centering icon
         }
         document.getElementById('category').addEventListener('change', updateIcon);
         fetchSubMeta();

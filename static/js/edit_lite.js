@@ -39,11 +39,18 @@ document.addEventListener('DOMContentLoaded', function(){
   const subJson = document.getElementById('subCategoriesData');
   const allSub = subJson ? JSON.parse(subJson.textContent||'[]') : [];
   const subOptionsByMain = {}; const subToMain = {}; const subName = {};
-  for (const [sid, mid, name] of allSub){
+  for (const [sid, mid, name, color, icon] of allSub){
     if (!subOptionsByMain[mid]) subOptionsByMain[mid] = [];
-    subOptionsByMain[mid].push([sid, name]);
+    subOptionsByMain[mid].push([sid, name, color, icon]);
     subToMain[sid] = mid; subName[sid] = name;
   }
+
+  const mainJson = document.getElementById('mainCategoriesData');
+  const allMain = mainJson ? JSON.parse(mainJson.textContent||'[]') : [];
+  const mainColorById = {};
+  allMain.forEach(([mid, name, color]) => {
+    mainColorById[String(mid)] = color;
+  });
 
   function showAlert(msg, type='warning', timeout=3000){
     alertArea.innerHTML = `<div class="alert alert-${type} py-2" role="alert">${msg}</div>`;
@@ -117,7 +124,39 @@ document.addEventListener('DOMContentLoaded', function(){
       // Amount
       const tdAmt = document.createElement('td'); const inAmt = document.createElement('input'); inAmt.type='text'; inAmt.inputMode='numeric'; inAmt.className='form-control form-control-sm'; inAmt.value = (r.amount!=null)? nf.format(r.amount):''; inAmt.addEventListener('input',()=>{ const raw=(inAmt.value||'').replace(/[^\d\-]/g,''); if(!raw){ r.amount=null; inAmt.value=''; markDirty(); return;} const num=Number(raw); if(!Number.isNaN(num)){ inAmt.value=nf.format(num); r.amount=num; markDirty(); } }); tdAmt.appendChild(inAmt); tr.appendChild(tdAmt);
       // Sub-category
-      const tdSub = document.createElement('td'); const selS=document.createElement('select'); selS.className='form-select form-select-sm'; subChoices.forEach(([sid,name])=>{ const o=document.createElement('option'); o.value=sid; o.textContent=name; selS.appendChild(o); }); selS.value = r.sub_category_id || (subChoices[0]?.[0]||''); selS.addEventListener('change',()=>{ r.sub_category_id=parseInt(selS.value,10); markDirty(); }); tdSub.appendChild(selS); tr.appendChild(tdSub);
+      const tdSub = document.createElement('td');
+      const selS = document.createElement('select');
+      selS.className = 'form-select form-select-sm';
+      subChoices.forEach(([sid, name, color, icon]) => {
+        const o = document.createElement('option');
+        o.value = sid;
+        // Create a span for the icon with main category color
+        const mainCatId = subToMain[sid]; // Get main category ID for this sub-category
+        const mainColor = mainColorById[String(mainCatId)] || '#64748b'; // Default color
+        
+        const iconSpan = document.createElement('span');
+        iconSpan.textContent = icon || '';
+        iconSpan.style.backgroundColor = mainColor;
+        iconSpan.style.color = '#fff'; // White icon color
+        iconSpan.style.borderRadius = '50%';
+        iconSpan.style.width = '1.2em';
+        iconSpan.style.height = '1.2em';
+        iconSpan.style.display = 'inline-grid';
+        iconSpan.style.placeItems = 'center';
+        iconSpan.style.marginRight = '0.3em';
+        iconSpan.style.verticalAlign = 'middle';
+
+        // Append icon span and name to a temporary div to get innerHTML
+        const tempDiv = document.createElement('div');
+        tempDiv.appendChild(iconSpan);
+        tempDiv.appendChild(document.createTextNode(name));
+        o.innerHTML = tempDiv.innerHTML; // Set innerHTML to include styled span
+
+        selS.appendChild(o);
+      });
+      selS.value = r.sub_category_id || (subChoices[0]?.[0]||'');
+      selS.addEventListener('change',()=>{ r.sub_category_id=parseInt(selS.value,10); markDirty(); });
+      tdSub.appendChild(selS); tr.appendChild(tdSub);
       // Ops
       const tdOps = document.createElement('td'); const delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-sm btn-outline-danger'; delBtn.textContent='削除'; delBtn.addEventListener('click',()=>{ if(!confirm('削除としてマークします。よろしいですか？')) return; if(r.id>0){ deleted.add(r.id);} else { rows=rows.filter(x=>x!==r);} render(); markDirty(); }); tdOps.appendChild(delBtn); tr.appendChild(tdOps);
 
