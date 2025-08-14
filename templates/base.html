@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/motion.css') }}">
 </head>
-<body data-current-ym="{{ selected_month }}">
+<body data-current-ym="{{ selected_month }}" data-available-months='{{ months | tojson | safe }}'>
     <div class="container-fluid">
         {% if session.get('auth_user') %}
         <!-- Sidebar open button -->

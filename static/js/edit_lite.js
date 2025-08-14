@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function(){
       selS.addEventListener('change',()=>{ r.sub_category_id=parseInt(selS.value,10); markDirty(); });
       tdSub.appendChild(selS); tr.appendChild(tdSub);
       // Ops
-      const tdOps = document.createElement('td'); const delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-sm btn-outline-danger'; delBtn.textContent='削除'; delBtn.addEventListener('click',()=>{ if(!confirm('削除としてマークします。よろしいですか？')) return; if(r.id>0){ deleted.add(r.id);} else { rows=rows.filter(x=>x!==r);} render(); markDirty(); }); tdOps.appendChild(delBtn); tr.appendChild(tdOps);
+      const tdOps = document.createElement('td'); tdOps.style.minWidth = '60px'; const delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-sm btn-outline-danger'; delBtn.textContent='削除'; delBtn.addEventListener('click',()=>{ if(!confirm('削除としてマークします。よろしいですか？')) return; if(r.id>0){ deleted.add(r.id);} else { rows=rows.filter(x=>x!==r);} render(); markDirty(); }); tdOps.appendChild(delBtn); tr.appendChild(tdOps);
 
       tbody.appendChild(tr);
     });

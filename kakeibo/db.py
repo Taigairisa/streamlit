@@ -225,7 +225,7 @@ def get_monthly_summary(aikotoba_id: int | None = None):
         """
         SELECT strftime('%Y-%m', date) as month, type, SUM(amount) as total
         FROM transactions
-        WHERE date >= '2023-10-01' {aikotoba_clause}
+        WHERE 1=1 {aikotoba_clause}
         GROUP BY month, type
         ORDER BY month
         """
@@ -352,4 +352,25 @@ def get_sub_category_by_id(sub_category_id: int):
     sql = text("SELECT id, main_category_id, name FROM sub_categories WHERE id = :id")
     with ENGINE.connect() as conn:
         result = conn.execute(sql, {"id": sub_category_id}).fetchone()
+    return result
+
+def get_oldest_transaction_month(aikotoba_id: int | None = None) -> str | None:
+    """Return the oldest transaction month (YYYY-MM) from the database."""
+    engine = connect_db()
+    query = text(
+        """
+        SELECT strftime('%Y-%m', MIN(date)) as oldest_month
+        FROM transactions
+        {aikotoba_clause}
+        """
+    )
+    params = {}
+    aikotoba_clause = ""
+    if aikotoba_id is not None:
+        aikotoba_clause = "WHERE aikotoba_id = :aid"
+        params["aid"] = aikotoba_id
+    
+    q = text(query.text.format(aikotoba_clause=aikotoba_clause))
+    with engine.connect() as conn:
+        result = conn.execute(q, params).scalar()
     return result

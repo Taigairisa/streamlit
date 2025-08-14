@@ -19,13 +19,18 @@ function updateMonthNavButtons() {
   const today = new Date();
   const currentYm = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const displayedYm = document.body.dataset.currentYm;
+  const availableMonths = JSON.parse(document.body.dataset.availableMonths || '[]');
 
   const mNextBtn = document.getElementById('mNext');
   if (mNextBtn) {
     mNextBtn.disabled = (displayedYm === currentYm);
   }
-  // mPrev button is not requested to be disabled for earliest month,
-  // and current implementation allows infinite backward navigation.
+
+  const mPrevBtn = document.getElementById('mPrev');
+  if (mPrevBtn && availableMonths.length > 0) {
+    const oldestYm = availableMonths[availableMonths.length - 1];
+    mPrevBtn.disabled = (displayedYm === oldestYm);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

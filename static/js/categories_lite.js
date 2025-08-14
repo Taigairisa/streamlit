@@ -154,6 +154,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
       // Ops
       const tdOps = document.createElement('td');
+      tdOps.style.minWidth = '60px';
       const delBtn = document.createElement('button'); delBtn.type='button'; delBtn.className='btn btn-sm btn-outline-danger'; delBtn.textContent='削除';
       delBtn.addEventListener('click', ()=>{
         if (!confirm('削除としてマークします。よろしいですか？')) return;

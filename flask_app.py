@@ -20,6 +20,7 @@ from kakeibo.db import (
     get_budget_and_spent_of_month,
     ensure_aikotoba_schema,
     get_aikotoba_id,
+    get_oldest_transaction_month,
 )
 import json
 from flask import send_file
@@ -89,16 +90,23 @@ def require_login_guard():
             return jsonify({"error": "Unauthorized"}), 401
 
 def get_sidebar_data(selected_month=None):
+    aid = _get_current_user_aikotoba_id()
+    
     # Month selection for budget progress
-    months = [
-        (datetime.now(pytz.timezone('Asia/Tokyo')) - relativedelta(months=i)).strftime("%Y-%m")
-        for i in range(12)
-    ]
+    monthly_summary_df = get_monthly_summary(aikotoba_id=aid)
+    if not monthly_summary_df.empty:
+        months = sorted(monthly_summary_df['month'].dt.strftime('%Y-%m').unique(), reverse=True)
+    else:
+        months = []
+
+    if not months:
+        # Fallback if no transactions
+        months = [(datetime.now(pytz.timezone('Asia/Tokyo')) - relativedelta(months=i)).strftime("%Y-%m") for i in range(12)]
+
     if selected_month is None:
         selected_month = months[0]
 
     # Budget progress
-    aid = _get_current_user_aikotoba_id()
     spent, budget, _ = get_budget_and_spent_of_month(selected_month, aid)
     budget_progress = []
     for category in budget.index:
